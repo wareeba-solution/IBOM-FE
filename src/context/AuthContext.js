@@ -18,28 +18,28 @@ export const AuthProvider = ({ children }) => {
 
   // Check if token exists and is valid on initial load
   useEffect(() => {
-    const verifyToken = async () => {
-      if (token) {
-        try {
-          // Check token expiration
-          const decodedToken = jwt_decode(token);
-          const currentTime = Date.now() / 1000;
-          
-          if (decodedToken.exp < currentTime) {
-            // Token expired
-            logout();
-          } else {
-            // Get user data
-            const userData = await authService.getCurrentUser();
-            setUser(userData);
-          }
-        } catch (err) {
-          console.error('Token verification failed:', err);
+   const verifyToken = async () => {
+    if (token) {
+      try {
+        const decodedToken = jwt_decode(token);
+        const currentTime = Date.now() / 1000;
+
+        if (decodedToken.exp < currentTime) {
+          // Token expired, do not proceed
           logout();
+          return; // <-- prevent setLoading from being called
         }
+
+        const userData = await authService.getCurrentUser();
+        setUser(userData);
+      } catch (err) {
+        console.error('Token verification failed:', err);
+        logout();
+        return; // <-- same here
       }
-      setLoading(false);
-    };
+    }
+    setLoading(false);
+  };
 
     verifyToken();
   }, [token]);
@@ -74,6 +74,7 @@ export const AuthProvider = ({ children }) => {
       // Update state
       setToken(token);
       setUser(user);
+      //setLoading(false);
       
       // Implement direct redirection based on role
       if (user.role === 'admin') {
@@ -87,6 +88,7 @@ export const AuthProvider = ({ children }) => {
         setTimeout(() => {
           window.location.href = '/dashboard';
         }, 100);
+         //setLoading(false);
       }
       
       return { success: true, user };

@@ -33,6 +33,7 @@ const PrivateRoute = ({ children, requiredRole }) => {
   
   // Check role if required
   if (requiredRole) {
+    console.log("Checking user role...");
     console.log("Required role:", requiredRole);
     console.log("User role:", user?.role);
     if (!user || user.role !== requiredRole) {
@@ -45,7 +46,7 @@ const PrivateRoute = ({ children, requiredRole }) => {
   
   // Return children if provided, otherwise use Outlet
   // This allows both nested routes and component wrapper approaches
-  return children ? children : <Outlet />;
+  return  <Outlet />;
 };
 
 export default PrivateRoute;

@@ -146,12 +146,12 @@ const AppRoutes = () => {
         <Route path="diseases/statistics" element={<DiseaseStatistics />} />
 
         {/* Facility routes */}
-        <Route path="/facilities" element={<FacilitiesList />} />
-        <Route path="/facilities/new" element={<FacilityForm />} />
-        <Route path="/facilities/map" element={<FacilityMap />} />
-        <Route path="/facilities/statistics" element={<FacilityStatistics />} />
-        <Route path="/facilities/:id" element={<FacilityDetail />} />
-        <Route path="/facilities/:id/edit" element={<FacilityForm />} />
+        <Route path="facilities" element={<FacilitiesList />} />
+        <Route path="facilities/new" element={<FacilityForm />} />
+        <Route path="facilities/map" element={<FacilityMap />} />
+        <Route path="facilities/statistics" element={<FacilityStatistics />} />
+        <Route path="facilities/:id" element={<FacilityDetail />} />
+        <Route path="facilities/:id/edit" element={<FacilityForm />} />
 
         {/* Report routes */}
         <Route path="reports" element={<CustomReports />} />

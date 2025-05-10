@@ -52,7 +52,7 @@ const drawerWidth = 240;
 
 // Navigation items configuration
 const mainNavItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/Dashboard' },
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Patients', icon: <PersonIcon />, path: '/patients' },
   { text: 'Birth Records', icon: <BirthIcon />, path: '/births' },
   { text: 'Death Records', icon: <DeathIcon />, path: '/deaths' },
@@ -102,6 +102,8 @@ const MainLayout = ({ children, title, breadcrumbs = [] }) => {
     handleProfileMenuClose();
     navigate('/settings/profile');
   };
+
+  console.log("User man role:", user?.role);
 
   // Generate breadcrumbs with proper paths
   const generateBreadcrumbs = () => {
