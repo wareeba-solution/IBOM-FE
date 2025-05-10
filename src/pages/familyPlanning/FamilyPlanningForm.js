@@ -1,0 +1,1092 @@
+// src/pages/familyPlanning/FamilyPlanningForm.js
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Paper,
+  Typography,
+  Button,
+  Grid,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormHelperText,
+  Checkbox,
+  FormControlLabel,
+  Divider,
+  Alert,
+  CircularProgress,
+  Card,
+  CardContent,
+  CardHeader,
+  IconButton,
+  RadioGroup,
+  Radio,
+  Autocomplete,
+  FormLabel,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+} from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import {
+  Save as SaveIcon,
+  Close as CloseIcon,
+  ArrowBack as ArrowBackIcon,
+  Add as AddIcon,
+  Search as SearchIcon,
+} from '@mui/icons-material';
+import { format, parseISO, addMonths } from 'date-fns';
+import { useFormik } from 'formik';
+import * as Yup from 'yup';
+import MainLayout from '../../components/common/Layout/MainLayout';
+import { useApi } from '../../hooks/useApi';
+
+// Mock family planning service - replace with actual service when available
+const familyPlanningService = {
+  getRecordById: async (id) => {
+    // Simulate API call for edit mode
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        if (id) {
+          const visitDate = new Date();
+          visitDate.setMonth(visitDate.getMonth() - (parseInt(id) % 12));
+          
+          const nextVisitDate = new Date(visitDate);
+          nextVisitDate.setMonth(nextVisitDate.getMonth() + 3);
+          
+          const age = 18 + (parseInt(id) % 30);
+          const isMale = parseInt(id) % 10 === 0; // Mostly female clients, but some male for condoms or vasectomy
+          
+          const contraceptiveMethods = [
+            'Oral Contraceptives',
+            'Injectable Contraceptives',
+            'Intrauterine Device (IUD)',
+            'Implant',
+            'Condoms',
+            'Female Sterilization',
+            'Male Sterilization',
+            'Natural Family Planning',
+            'Emergency Contraception',
+            'Other'
+          ];
+          
+          const visitTypes = [
+            'Initial Consultation',
+            'Follow-up',
+            'Method Change',
+            'Method Renewal',
+            'Side Effects Consultation',
+            'Counseling Only',
+            'Removal',
+            'Other'
+          ];
+          
+          const mockRecord = {
+            id,
+            record_id: `FP${10000 + parseInt(id)}`,
+            patient_id: `PT${5000 + parseInt(id)}`,
+            patient_name: `${isMale ? 'John' : 'Jane'} ${['Doe', 'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Miller'][parseInt(id) % 7]} ${id}`,
+            age: age,
+            gender: isMale ? 'Male' : 'Female',
+            visit_date: visitDate.toISOString().split('T')[0],
+            next_visit_date: nextVisitDate.toISOString().split('T')[0],
+            visit_type: visitTypes[parseInt(id) % visitTypes.length],
+            method: isMale ? 
+              (parseInt(id) % 5 === 0 ? 'Male Sterilization' : 'Condoms') : 
+              contraceptiveMethods[parseInt(id) % (contraceptiveMethods.length - 2)],
+            quantity_provided: parseInt(id) % 5 === 0 ? 0 : (parseInt(id) % 10 + 1),
+            location: `${['Uyo', 'Ikot Ekpene', 'Eket', 'Oron', 'Abak'][parseInt(id) % 5]} Health Center`,
+            provider: `Provider ${parseInt(id) % 10 + 1}`,
+            has_side_effects: (parseInt(id) % 7 === 0),
+            side_effects: parseInt(id) % 7 === 0 ? 
+              'Patient reported headaches and nausea after starting the method.' : '',
+            is_new_acceptor: (parseInt(id) % 5 === 0),
+            parity: parseInt(id) % 8,
+            marital_status: ['Single', 'Married', 'Divorced', 'Widowed'][parseInt(id) % 4],
+            education_level: ['None', 'Primary', 'Secondary', 'Tertiary'][parseInt(id) % 4],
+            partner_support: ['Supportive', 'Unsupportive', 'Unaware', 'N/A'][parseInt(id) % 4],
+            reason_for_visit: parseInt(id) % 5 === 0 ? 
+              'Patient wants to start family planning.' : 
+              (parseInt(id) % 7 === 0 ? 
+                'Patient experiencing side effects.' : 
+                'Routine follow-up visit.'),
+            counseling_provided: true,
+            counseling_notes: 'Discussed all available methods and their side effects. Emphasized importance of consistent use.',
+            follow_up_plan: 'Return in 3 months for method renewal or sooner if experiencing issues.',
+            notes: parseInt(id) % 3 === 0 ? 
+              'Patient expressed concern about privacy. Reassured about confidentiality.' : ''
+          };
+          resolve(mockRecord);
+        } else {
+          // New record with default values
+          resolve({
+            id: '',
+            record_id: '',
+            patient_id: '',
+            patient_name: '',
+            age: '',
+            gender: 'Female',
+            visit_date: new Date().toISOString().split('T')[0],
+            next_visit_date: addMonths(new Date(), 3).toISOString().split('T')[0],
+            visit_type: 'Initial Consultation',
+            method: '',
+            quantity_provided: 0,
+            location: '',
+            provider: '',
+            has_side_effects: false,
+            side_effects: '',
+            is_new_acceptor: true,
+            parity: 0,
+            marital_status: '',
+            education_level: '',
+            partner_support: '',
+            reason_for_visit: '',
+            counseling_provided: true,
+            counseling_notes: '',
+            follow_up_plan: '',
+            notes: ''
+          });
+        }
+      }, 500);
+    });
+  },
+  saveRecord: async (recordData) => {
+    // Simulate API call for save/update
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const newId = recordData.id || Math.floor(Math.random() * 1000) + 50;
+        resolve({
+          success: true,
+          id: newId,
+          record_id: recordData.record_id || `FP${10000 + newId}`
+        });
+      }, 700);
+    });
+  },
+  searchPatients: async (query) => {
+    // Simulate patient search API call
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const mockPatients = Array.from({ length: 5 }, (_, i) => ({
+          id: `PT${5000 + i}`,
+          name: `${i % 2 === 0 ? 'John' : 'Jane'} ${['Doe', 'Smith', 'Johnson', 'Williams', 'Brown'][i % 5]} ${query || ''}`,
+          age: 20 + i * 5,
+          gender: i % 2 === 0 ? 'Male' : 'Female',
+        }));
+        resolve(mockPatients);
+      }, 300);
+    });
+  },
+};
+
+// Contraceptive methods
+const contraceptiveMethods = [
+  'Oral Contraceptives',
+  'Injectable Contraceptives',
+  'Intrauterine Device (IUD)',
+  'Implant',
+  'Condoms',
+  'Female Sterilization',
+  'Male Sterilization',
+  'Natural Family Planning',
+  'Emergency Contraception',
+  'Other'
+];
+
+// Visit types
+const visitTypes = [
+  'Initial Consultation',
+  'Follow-up',
+  'Method Change',
+  'Method Renewal',
+  'Side Effects Consultation',
+  'Counseling Only',
+  'Removal',
+  'Other'
+];
+
+// Marital status options
+const maritalStatusOptions = [
+  'Single',
+  'Married',
+  'Divorced',
+  'Widowed'
+];
+
+// Education level options
+const educationLevelOptions = [
+  'None',
+  'Primary',
+  'Secondary',
+  'Tertiary'
+];
+
+// Partner support options
+const partnerSupportOptions = [
+  'Supportive',
+  'Unsupportive',
+  'Unaware',
+  'N/A'
+];
+
+// Form validation schema
+const validationSchema = Yup.object({
+  patient_id: Yup.string().required('Patient ID is required'),
+  patient_name: Yup.string().required('Patient name is required'),
+  gender: Yup.string().required('Gender is required'),
+  age: Yup.number().required('Age is required').min(12, 'Age must be at least 12').max(100, 'Age must be under 100'),
+  visit_date: Yup.date().nullable().required('Visit date is required'),
+  visit_type: Yup.string().required('Visit type is required'),
+  method: Yup.string().required('Method is required'),
+  location: Yup.string().required('Location is required'),
+  provider: Yup.string().required('Provider is required'),
+  marital_status: Yup.string().required('Marital status is required'),
+  quantity_provided: Yup.number().min(0, 'Quantity cannot be negative'),
+  counseling_provided: Yup.boolean(),
+  counseling_notes: Yup.string().when('counseling_provided', {
+    is: true,
+    then: () => Yup.string().required('Counseling notes are required when counseling is provided')
+  }),
+  side_effects: Yup.string().when('has_side_effects', {
+    is: true,
+    then: () => Yup.string().required('Side effects description is required when side effects are reported')
+  }),
+});
+
+// Family Planning Form Component
+const FamilyPlanningForm = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { loading, error, execute } = useApi();
+
+  // State
+  const [patientSearchResults, setPatientSearchResults] = useState([]);
+  const [patientSearchQuery, setPatientSearchQuery] = useState('');
+  const [isSearchingPatient, setIsSearchingPatient] = useState(false);
+  const [patientSelectOpen, setPatientSelectOpen] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [savedRecordId, setSavedRecordId] = useState(null);
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+
+  // Initialize formik
+  const formik = useFormik({
+    initialValues: {
+      id: '',
+      record_id: '',
+      patient_id: '',
+      patient_name: '',
+      age: '',
+      gender: 'Female',
+      visit_date: new Date(),
+      next_visit_date: addMonths(new Date(), 3),
+      visit_type: 'Initial Consultation',
+      method: '',
+      quantity_provided: 0,
+      location: '',
+      provider: '',
+      has_side_effects: false,
+      side_effects: '',
+      is_new_acceptor: true,
+      parity: 0,
+      marital_status: '',
+      education_level: '',
+      partner_support: '',
+      reason_for_visit: '',
+      counseling_provided: true,
+      counseling_notes: '',
+      follow_up_plan: '',
+      notes: ''
+    },
+    validationSchema,
+    onSubmit: handleSubmit,
+  });
+
+  // Load family planning record when editing
+  useEffect(() => {
+    const loadRecord = async () => {
+      await execute(
+        familyPlanningService.getRecordById,
+        [id],
+        (response) => {
+          const formattedData = {
+            ...response,
+            visit_date: response.visit_date ? parseISO(response.visit_date) : new Date(),
+            next_visit_date: response.next_visit_date ? parseISO(response.next_visit_date) : addMonths(new Date(), 3),
+          };
+          formik.setValues(formattedData);
+        }
+      );
+    };
+    
+    loadRecord();
+  }, [id]);
+
+  // Handle patient search
+  useEffect(() => {
+    if (patientSearchQuery) {
+      const searchPatients = async () => {
+        setIsSearchingPatient(true);
+        try {
+          const results = await familyPlanningService.searchPatients(patientSearchQuery);
+          setPatientSearchResults(results);
+        } catch (error) {
+          console.error('Error searching patients:', error);
+        } finally {
+          setIsSearchingPatient(false);
+        }
+      };
+      
+      const debounce = setTimeout(() => {
+        searchPatients();
+      }, 300);
+      
+      return () => clearTimeout(debounce);
+    } else {
+      setPatientSearchResults([]);
+    }
+  }, [patientSearchQuery]);
+
+  // Handle patient selection
+  const handlePatientSelect = (patient) => {
+    if (patient) {
+      formik.setFieldValue('patient_id', patient.id);
+      formik.setFieldValue('patient_name', patient.name);
+      formik.setFieldValue('age', patient.age);
+      formik.setFieldValue('gender', patient.gender);
+      
+      // Adjust method options based on gender
+      if (patient.gender === 'Male' && 
+          formik.values.method !== 'Condoms' && 
+          formik.values.method !== 'Male Sterilization') {
+        formik.setFieldValue('method', '');
+      }
+    }
+    setPatientSelectOpen(false);
+  };
+
+  // Handle next visit date update based on method
+  useEffect(() => {
+    if (formik.values.method && formik.values.visit_date) {
+      let months = 3; // Default follow-up period
+      
+      // Adjust based on method
+      switch(formik.values.method) {
+        case 'Oral Contraceptives':
+          months = 3;
+          break;
+        case 'Injectable Contraceptives':
+          months = 3;
+          break;
+        case 'Intrauterine Device (IUD)':
+          months = 6;
+          break;
+        case 'Implant':
+          months = 12;
+          break;
+        case 'Condoms':
+          months = 3;
+          break;
+        case 'Female Sterilization':
+        case 'Male Sterilization':
+          months = 3; // Initial follow-up
+          break;
+        default:
+          months = 3;
+      }
+      
+      // Only update if the field hasn't been manually changed
+      if (formik.values.visit_date && (!formik.touched.next_visit_date || id === undefined)) {
+        const nextDate = addMonths(formik.values.visit_date, months);
+        formik.setFieldValue('next_visit_date', nextDate);
+      }
+    }
+  }, [formik.values.method, formik.values.visit_date]);
+
+  // Form submission handler
+  async function handleSubmit(values) {
+    try {
+      await execute(
+        familyPlanningService.saveRecord,
+        [values],
+        (response) => {
+          setSavedRecordId(response.record_id);
+          setSuccessDialogOpen(true);
+        }
+      );
+    } catch (error) {
+      console.error('Error saving record:', error);
+    }
+  }
+
+  // Cancel form handling
+  const handleCancelClick = () => {
+    if (formik.dirty) {
+      setConfirmDialogOpen(true);
+    } else {
+      navigate('/family-planning');
+    }
+  };
+
+  const handleConfirmCancel = () => {
+    setConfirmDialogOpen(false);
+    navigate('/family-planning');
+  };
+
+  const handleSuccessDialogClose = () => {
+    setSuccessDialogOpen(false);
+    navigate(`/family-planning/${id || formik.values.id}`);
+  };
+
+  // Format date for display
+  const formatDate = (date) => {
+    if (!date) return '';
+    try {
+      return format(date, 'MMMM dd, yyyy');
+    } catch (error) {
+      return '';
+    }
+  };
+
+  return (
+    <MainLayout 
+      title={id ? "Edit Family Planning Record" : "New Family Planning Record"}
+      breadcrumbs={[
+        { name: 'Family Planning', path: '/family-planning' },
+        { name: id ? 'Edit Record' : 'New Record', active: true }
+      ]}
+    >
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <IconButton
+            color="inherit"
+            onClick={handleCancelClick}
+            sx={{ mr: 2 }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+          <Typography variant="h5" component="h1">
+            {id ? "Edit Family Planning Record" : "New Family Planning Record"}
+          </Typography>
+        </Box>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
+        <form onSubmit={formik.handleSubmit}>
+          <Card sx={{ mb: 3 }}>
+            <CardHeader title="Patient Information" />
+            <Divider />
+            <CardContent>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    id="patient_id"
+                    name="patient_id"
+                    label="Patient ID"
+                    value={formik.values.patient_id}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    error={formik.touched.patient_id && Boolean(formik.errors.patient_id)}
+                    helperText={formik.touched.patient_id && formik.errors.patient_id}
+                    disabled={loading}
+                    required
+                    InputProps={{
+                      endAdornment: (
+                        <IconButton 
+                          size="small" 
+                          onClick={() => setPatientSelectOpen(true)}
+                          disabled={loading}
+                        >
+                          <SearchIcon />
+                        </IconButton>
+                      ),
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={8}>
+                  <TextField
+                    fullWidth
+                    id="patient_name"
+                    name="patient_name"
+                    label="Patient Name"
+                    value={formik.values.patient_name}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    error={formik.touched.patient_name && Boolean(formik.errors.patient_name)}
+                    helperText={formik.touched.patient_name && formik.errors.patient_name}
+                    disabled={loading}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <FormControl 
+                    fullWidth 
+                    error={formik.touched.gender && Boolean(formik.errors.gender)}
+                    disabled={loading}
+                    required
+                  >
+                    <InputLabel id="gender-label">Gender</InputLabel>
+                    <Select
+                      labelId="gender-label"
+                      id="gender"
+                      name="gender"
+                      value={formik.values.gender}
+                      onChange={(e) => {
+                        formik.handleChange(e);
+                        // Reset method if switching genders
+                        if (e.target.value === 'Male' && 
+                            formik.values.method !== 'Condoms' && 
+                            formik.values.method !== 'Male Sterilization') {
+                          formik.setFieldValue('method', '');
+                        }
+                      }}
+                      onBlur={formik.handleBlur}
+                      label="Gender"
+                    >
+                      <MenuItem value="Female">Female</MenuItem>
+                      <MenuItem value="Male">Male</MenuItem>
+                    </Select>
+                    {formik.touched.gender && formik.errors.gender && (
+                      <FormHelperText>{formik.errors.gender}</FormHelperText>
+                    )}
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    id="age"
+                    name="age"
+                    label="Age"
+                    type="number"
+                    value={formik.values.age}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    error={formik.touched.age && Boolean(formik.errors.age)}
+                    helperText={formik.touched.age && formik.errors.age}
+                    disabled={loading}
+                    required
+                    inputProps={{ min: 12, max: 100 }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <FormControl 
+                    fullWidth 
+                    error={formik.touched.marital_status && Boolean(formik.errors.marital_status)}
+                    disabled={loading}
+                    required
+                  >
+                    <InputLabel id="marital-status-label">Marital Status</InputLabel>
+                    <Select
+                      labelId="marital-status-label"
+                      id="marital_status"
+                      name="marital_status"
+                      value={formik.values.marital_status}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      label="Marital Status"
+                    >
+                      {maritalStatusOptions.map((status) => (
+                        <MenuItem key={status} value={status}>{status}</MenuItem>
+                      ))}
+                    </Select>
+                    {formik.touched.marital_status && formik.errors.marital_status && (
+                      <FormHelperText>{formik.errors.marital_status}</FormHelperText>
+                    )}
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <FormControl fullWidth>
+                    <InputLabel id="education-level-label">Education Level</InputLabel>
+                    <Select
+                      labelId="education-level-label"
+                      id="education_level"
+                      name="education_level"
+                      value={formik.values.education_level}
+                      onChange={formik.handleChange}
+                      label="Education Level"
+                    >
+                      {educationLevelOptions.map((level) => (
+                        <MenuItem key={level} value={level}>{level}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    id="parity"
+                    name="parity"
+                    label="Parity"
+                    type="number"
+                    value={formik.values.parity}
+                    onChange={formik.handleChange}
+                    disabled={loading || formik.values.gender === 'Male'}
+                    inputProps={{ min: 0 }}
+                    helperText={formik.values.gender === 'Male' ? 'Not applicable for male patients' : ''}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <FormControl fullWidth>
+                    <InputLabel id="partner-support-label">Partner Support</InputLabel>
+                    <Select
+                      labelId="partner-support-label"
+                      id="partner_support"
+                      name="partner_support"
+                      value={formik.values.partner_support}
+                      onChange={formik.handleChange}
+                      label="Partner Support"
+                    >
+                      {partnerSupportOptions.map((option) => (
+                        <MenuItem key={option} value={option}>{option}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          <Card sx={{ mb: 3 }}>
+            <CardHeader title="Visit Information" />
+            <Divider />
+            <CardContent>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={4}>
+                  <LocalizationProvider dateAdapter={AdapterDateFns}>
+                    <DatePicker
+                      label="Visit Date *"
+                      value={formik.values.visit_date}
+                      onChange={(value) => formik.setFieldValue('visit_date', value)}
+                      slotProps={{ 
+                        textField: { 
+                          fullWidth: true,
+                          error: formik.touched.visit_date && Boolean(formik.errors.visit_date),
+                          helperText: formik.touched.visit_date && formik.errors.visit_date,
+                          onBlur: () => formik.setFieldTouched('visit_date', true)
+                        } 
+                      }}
+                      disabled={loading}
+                    />
+                  </LocalizationProvider>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <LocalizationProvider dateAdapter={AdapterDateFns}>
+                    <DatePicker
+                      label="Next Visit Date"
+                      value={formik.values.next_visit_date}
+                      onChange={(value) => {
+                        formik.setFieldValue('next_visit_date', value);
+                        formik.setFieldTouched('next_visit_date', true);
+                      }}
+                      slotProps={{ 
+                        textField: { 
+                          fullWidth: true,
+                        } 
+                      }}
+                      disabled={loading}
+                    />
+                  </LocalizationProvider>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <FormControl 
+                    fullWidth 
+                    error={formik.touched.visit_type && Boolean(formik.errors.visit_type)}
+                    disabled={loading}
+                    required
+                  >
+                    <InputLabel id="visit-type-label">Visit Type</InputLabel>
+                    <Select
+                      labelId="visit-type-label"
+                      id="visit_type"
+                      name="visit_type"
+                      value={formik.values.visit_type}
+                      onChange={(e) => {
+                        formik.handleChange(e);
+                        // Set new acceptor based on visit type
+                        if (e.target.value === 'Initial Consultation') {
+                          formik.setFieldValue('is_new_acceptor', true);
+                        }
+                      }}
+                      onBlur={formik.handleBlur}
+                      label="Visit Type"
+                    >
+                      {visitTypes.map((type) => (
+                        <MenuItem key={type} value={type}>{type}</MenuItem>
+                      ))}
+                    </Select>
+                    {formik.touched.visit_type && formik.errors.visit_type && (
+                      <FormHelperText>{formik.errors.visit_type}</FormHelperText>
+                    )}
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    id="location"
+                    name="location"
+                    label="Location"
+                    value={formik.values.location}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    error={formik.touched.location && Boolean(formik.errors.location)}
+                    helperText={formik.touched.location && formik.errors.location}
+                    disabled={loading}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    id="provider"
+                    name="provider"
+                    label="Provider"
+                    value={formik.values.provider}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    error={formik.touched.provider && Boolean(formik.errors.provider)}
+                    helperText={formik.touched.provider && formik.errors.provider}
+                    disabled={loading}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    id="reason_for_visit"
+                    name="reason_for_visit"
+                    label="Reason for Visit"
+                    multiline
+                    rows={2}
+                    value={formik.values.reason_for_visit}
+                    onChange={formik.handleChange}
+                    disabled={loading}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        id="is_new_acceptor"
+                        name="is_new_acceptor"
+                        checked={formik.values.is_new_acceptor}
+                        onChange={formik.handleChange}
+                        disabled={loading}
+                      />
+                    }
+                    label="New Acceptor (First time using family planning)"
+                  />
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          <Card sx={{ mb: 3 }}>
+            <CardHeader title="Method and Counseling" />
+            <Divider />
+            <CardContent>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <FormControl 
+                    fullWidth 
+                    error={formik.touched.method && Boolean(formik.errors.method)}
+                    disabled={loading}
+                    required
+                  >
+                    <InputLabel id="method-label">Contraceptive Method</InputLabel>
+                    <Select
+                      labelId="method-label"
+                      id="method"
+                      name="method"
+                      value={formik.values.method}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      label="Contraceptive Method"
+                    >
+                      {formik.values.gender === 'Male' ? (
+                        // Only show male-appropriate methods
+                        contraceptiveMethods
+                          .filter(method => method === 'Condoms' || method === 'Male Sterilization' || method === 'Other')
+                          .map((method) => (
+                            <MenuItem key={method} value={method}>{method}</MenuItem>
+                          ))
+                      ) : (
+                        // Show all methods except male sterilization for females
+                        contraceptiveMethods
+                          .filter(method => method !== 'Male Sterilization')
+                          .map((method) => (
+                            <MenuItem key={method} value={method}>{method}</MenuItem>
+                          ))
+                      )}
+                    </Select>
+                    {formik.touched.method && formik.errors.method && (
+                      <FormHelperText>{formik.errors.method}</FormHelperText>
+                    )}
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    id="quantity_provided"
+                    name="quantity_provided"
+                    label="Quantity Provided"
+                    type="number"
+                    value={formik.values.quantity_provided}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    error={formik.touched.quantity_provided && Boolean(formik.errors.quantity_provided)}
+                    helperText={(formik.touched.quantity_provided && formik.errors.quantity_provided) || 
+                      (['Intrauterine Device (IUD)', 'Implant', 'Female Sterilization', 'Male Sterilization'].includes(formik.values.method) ? 
+                        'Not applicable for this method' : '')}
+                    disabled={loading || 
+                      ['Intrauterine Device (IUD)', 'Implant', 'Female Sterilization', 'Male Sterilization'].includes(formik.values.method)}
+                    inputProps={{ min: 0 }}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        id="counseling_provided"
+                        name="counseling_provided"
+                        checked={formik.values.counseling_provided}
+                        onChange={formik.handleChange}
+                        disabled={loading}
+                      />
+                    }
+                    label="Counseling Provided"
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    id="counseling_notes"
+                    name="counseling_notes"
+                    label="Counseling Notes"
+                    multiline
+                    rows={3}
+                    value={formik.values.counseling_notes}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    error={formik.touched.counseling_notes && Boolean(formik.errors.counseling_notes)}
+                    helperText={formik.touched.counseling_notes && formik.errors.counseling_notes}
+                    disabled={loading || !formik.values.counseling_provided}
+                    required={formik.values.counseling_provided}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    id="follow_up_plan"
+                    name="follow_up_plan"
+                    label="Follow-up Plan"
+                    multiline
+                    rows={2}
+                    value={formik.values.follow_up_plan}
+                    onChange={formik.handleChange}
+                    disabled={loading}
+                  />
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          <Card sx={{ mb: 3 }}>
+            <CardHeader title="Side Effects and Notes" />
+            <Divider />
+            <CardContent>
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        id="has_side_effects"
+                        name="has_side_effects"
+                        checked={formik.values.has_side_effects}
+                        onChange={formik.handleChange}
+                        disabled={loading}
+                      />
+                    }
+                    label="Side Effects Reported"
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    id="side_effects"
+                    name="side_effects"
+                    label="Side Effects Description"
+                    multiline
+                    rows={3}
+                    value={formik.values.side_effects}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    error={formik.touched.side_effects && Boolean(formik.errors.side_effects)}
+                    helperText={formik.touched.side_effects && formik.errors.side_effects}
+                    disabled={loading || !formik.values.has_side_effects}
+                    required={formik.values.has_side_effects}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    id="notes"
+                    name="notes"
+                    label="Additional Notes"
+                    multiline
+                    rows={3}
+                    value={formik.values.notes}
+                    onChange={formik.handleChange}
+                    disabled={loading}
+                  />
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+            <Button
+              variant="outlined"
+              onClick={handleCancelClick}
+              startIcon={<CloseIcon />}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              startIcon={loading ? <CircularProgress size={24} /> : <SaveIcon />}
+              disabled={loading}
+            >
+              {id ? 'Update Record' : 'Save Record'}
+            </Button>
+          </Box>
+        </form>
+      </Paper>
+
+      {/* Patient Search Dialog */}
+      <Dialog
+        open={patientSelectOpen}
+        onClose={() => setPatientSelectOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Search Patient</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Search by name or ID"
+            fullWidth
+            variant="outlined"
+            value={patientSearchQuery}
+            onChange={(e) => setPatientSearchQuery(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          
+          {isSearchingPatient ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : patientSearchResults.length > 0 ? (
+            <Box>
+              {patientSearchResults.map((patient) => (
+                <Box 
+                  key={patient.id}
+                  sx={{ 
+                    p: 2, 
+                    border: '1px solid #e0e0e0', 
+                    borderRadius: 1,
+                    mb: 1,
+                    cursor: 'pointer',
+                    '&:hover': { backgroundColor: '#f5f5f5' }
+                  }}
+                  onClick={() => handlePatientSelect(patient)}
+                >
+                  <Typography variant="subtitle1">{patient.name}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    ID: {patient.id} | Age: {patient.age} | Gender: {patient.gender}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          ) : patientSearchQuery ? (
+            <Alert severity="info">No patients found matching '{patientSearchQuery}'</Alert>
+          ) : patientSearchQuery ? (
+            <Alert severity="info">No patients found matching '{patientSearchQuery}'</Alert>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              Enter a name or ID to search for patients
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPatientSelectOpen(false)}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={() => navigate('/patients/new')}
+            startIcon={<AddIcon />}
+          >
+            New Patient
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirm Cancel Dialog */}
+      <Dialog
+        open={confirmDialogOpen}
+        onClose={() => setConfirmDialogOpen(false)}
+      >
+        <DialogTitle>Discard Changes?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            You have unsaved changes. Are you sure you want to leave this page? All changes will be lost.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDialogOpen(false)}>Stay</Button>
+          <Button onClick={handleConfirmCancel} color="error" autoFocus>
+            Discard
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Success Dialog */}
+      <Dialog
+        open={successDialogOpen}
+        onClose={handleSuccessDialogClose}
+      >
+        <DialogTitle>Record Saved</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Family planning record {savedRecordId} has been successfully {id ? 'updated' : 'recorded'}.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={handleSuccessDialogClose} 
+            variant="contained" 
+            color="primary" 
+            autoFocus
+          >
+            View Record
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </MainLayout>
+  );
+};
+
+export default FamilyPlanningForm;

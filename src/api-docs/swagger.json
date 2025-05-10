@@ -1,0 +1,318 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+      "title": "Akwa Ibom State Health Data Collection API",
+      "description": "API documentation for the Akwa Ibom State Health Data Collection and Reporting System",
+      "version": "1.0.0",
+      "contact": {
+        "name": "Akwa Ibom State Health Department",
+        "email": "support@akwaibomhealth.gov.ng"
+      }
+    },
+    "servers": [
+      {
+        "url": "/api",
+        "description": "API Base URL"
+      }
+    ],
+    "tags": [
+      {
+        "name": "Auth",
+        "description": "Authentication operations"
+      },
+      {
+        "name": "Users",
+        "description": "User management operations"
+      },
+      {
+        "name": "Facilities",
+        "description": "Facility management operations"
+      },
+      {
+        "name": "Patients",
+        "description": "Patient management operations"
+      },
+      {
+        "name": "Visits",
+        "description": "Patient visit operations"
+      },
+      {
+        "name": "Births",
+        "description": "Birth records operations"
+      },
+      {
+        "name": "Deaths",
+        "description": "Death records operations"
+      },
+      {
+        "name": "Immunization",
+        "description": "Immunization records operations"
+      },
+      {
+        "name": "Antenatal",
+        "description": "Antenatal care operations"
+      },
+      {
+        "name": "Diseases",
+        "description": "Communicable diseases operations"
+      },
+      {
+        "name": "Family Planning",
+        "description": "Family planning operations"
+      },
+      {
+        "name": "Reports",
+        "description": "Reports and statistics operations"
+      },
+      {
+        "name": "Data Import",
+        "description": "Data import operations"
+      }
+    ],
+    "components": {
+      "securitySchemes": {
+        "bearerAuth": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT"
+        }
+      },
+      "schemas": {
+        "User": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "username": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "firstName": {
+              "type": "string"
+            },
+            "lastName": {
+              "type": "string"
+            },
+            "roleId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "facilityId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "phoneNumber": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["active", "inactive", "pending"]
+            },
+            "lastLogin": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "LoginRequest": {
+          "type": "object",
+          "required": ["username", "password"],
+          "properties": {
+            "username": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string",
+              "format": "password"
+            }
+          }
+        },
+        "LoginResponse": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "user": {
+                  "$ref": "#/components/schemas/User"
+                },
+                "token": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "Patient": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "uniqueIdentifier": {
+              "type": "string"
+            },
+            "firstName": {
+              "type": "string"
+            },
+            "lastName": {
+              "type": "string"
+            },
+            "dateOfBirth": {
+              "type": "string",
+              "format": "date"
+            },
+            "gender": {
+              "type": "string",
+              "enum": ["male", "female", "other"]
+            },
+            "address": {
+              "type": "string"
+            },
+            "lgaOrigin": {
+              "type": "string"
+            },
+            "lgaResidence": {
+              "type": "string"
+            },
+            "occupation": {
+              "type": "string"
+            },
+            "phoneNumber": {
+              "type": "string"
+            },
+            "facilityId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "createdBy": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "Error": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "errors": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "responses": {
+        "UnauthorizedError": {
+          "description": "Authentication information is missing or invalid",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          }
+        },
+        "NotFoundError": {
+          "description": "The specified resource was not found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          }
+        },
+        "ValidationError": {
+          "description": "The request data failed validation",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          }
+        },
+        "ServerError": {
+          "description": "Internal server error",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          }
+        }
+      }
+    },
+    "security": [
+      {
+        "bearerAuth": []
+      }
+    ],
+    "paths": {
+      "/auth/login": {
+        "post": {
+          "tags": ["Auth"],
+          "summary": "Login to the system",
+          "description": "Authenticate user and get token",
+          "security": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginRequest"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Login successful",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/LoginResponse"
+                  }
+                }
+              }
+            },
+            "401": {
+              "$ref": "#/components/responses/UnauthorizedError"
+            },
+            "422": {
+              "$ref": "#/components/responses/ValidationError"
+            },
+            "500": {
+              "$ref": "#/components/responses/ServerError"
+            }
+          }
+        }
+      }
+    }
+  }
