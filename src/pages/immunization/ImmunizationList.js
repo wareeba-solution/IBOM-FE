@@ -224,7 +224,7 @@ const ImmunizationList = () => {
 
   // Handle statistics view
   const handleViewStatistics = () => {
-    navigate('/immunization/statistics');
+    navigate('/immunizations/statistics');
   };
 
   // Handle delete

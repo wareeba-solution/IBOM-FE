@@ -82,8 +82,12 @@ const diseaseService = {
             patient_id: `PT${5000 + parseInt(id)}`,
             patient_name: `${parseInt(id) % 2 === 0 ? 'John' : 'Jane'} ${['Doe', 'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Miller'][parseInt(id) % 7]} ${id}`,
             disease_type: diseaseTypes[parseInt(id) % diseaseTypes.length],
-            onset_date: onset.toISOString().split('T')[0],
-            report_date: reportDate.toISOString().split('T')[0],
+            onset_date:  onset instanceof Date && !isNaN(onset.getTime())
+            ? onset.toISOString().split('T')[0]
+            : null,
+            report_date: reportDate instanceof Date && !isNaN(reportDate.getTime())
+            ? reportDate.toISOString().split('T')[0]
+            : null,
             location: `${['Uyo', 'Ikot Ekpene', 'Eket', 'Oron', 'Abak'][parseInt(id) % 5]}, Akwa Ibom`,
             status: parseInt(id) % 10 === 0 ? 'suspected' : (parseInt(id) % 10 === 1 ? 'probable' : (parseInt(id) % 5 === 0 ? 'confirmed' : 'ruled_out')),
             severity: parseInt(id) % 10 === 0 ? 'severe' : (parseInt(id) % 5 === 0 ? 'moderate' : 'mild'),

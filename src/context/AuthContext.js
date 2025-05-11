@@ -107,7 +107,9 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      const response = await authService.register(userData);
+      //const response = await authService.register(userData);
+      const response = await axios.post('http://localhost:3000/api/auth/register', userData);
+      console.log("Registration response:", response.data);
       return { success: true, data: response };
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');

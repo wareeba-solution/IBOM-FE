@@ -28,7 +28,7 @@ import {
   TableRow,
   TableCell,
 } from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { DatePicker } from '@mui/lab';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import {
@@ -461,12 +461,13 @@ const FamilyPlanningStatistics = () => {
                   label="Start Date"
                   value={filters.start_date}
                   onChange={(value) => handleDateChange('start_date', value)}
-                  slotProps={{ 
-                    textField: { 
-                      size: 'small',
-                      fullWidth: true 
-                    } 
-                  }}
+                  renderInput={(params) => (
+                    <TextField 
+                      {...params} 
+                      size="small" 
+                      fullWidth 
+                    />
+                  )}
                 />
               </LocalizationProvider>
             </Grid>
