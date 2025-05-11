@@ -96,9 +96,8 @@ const AppRoutes = () => {
 
       {/* Protected routes with main layout */}
       <Route path="/" element={
-        <PrivateRoute>
-          <MainLayout />
-        </PrivateRoute>
+        <PrivateRoute />
+         
       }>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
@@ -167,10 +166,10 @@ const AppRoutes = () => {
         <Route path="family-planning/statistics" element={<FamilyPlanningStatistics />} />
 
         {/* Settings routes */}
-        <Route path="settings" element={<Settings />} />
-        <Route path="settings/profile" element={<UserProfile />} />
-        <Route path="settings/preferences" element={<Preferences />} />
-        <Route path="settings/security" element={<Security />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="settings/profile" element={<UserProfile />} />
+          <Route path="settings/preferences" element={<Preferences />} />
+          <Route path="settings/security" element={<Security />} />
 
         {/* Report routes */}
         <Route path="reports/export-data" element={<ExportData />} />

@@ -46,7 +46,11 @@ const PrivateRoute = ({ children, requiredRole }) => {
   
   // Return children if provided, otherwise use Outlet
   // This allows both nested routes and component wrapper approaches
-  return  <Outlet />;
+  return children ? (
+    children
+  ) : (
+    <Outlet />
+  );
 };
 
 export default PrivateRoute;

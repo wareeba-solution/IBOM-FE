@@ -22,7 +22,7 @@ import {
   useMediaQuery,
   useTheme
 } from '@mui/material';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
@@ -311,7 +311,7 @@ const MainLayout = ({ children, title, breadcrumbs = [] }) => {
             })}
           </Breadcrumbs>
         )}
-        {children}
+        {children || <Outlet />}
       </Box>
     </Box>
   );
