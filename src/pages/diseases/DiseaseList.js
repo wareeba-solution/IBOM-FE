@@ -743,7 +743,7 @@ const DiseaseList = () => {
               onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
               onPageChange={(newPage) => setPage(newPage)}
               rowCount={totalCases}
-              paginationMode="server"
+              paginationMode="client"
               page={page}
               autoHeight
               disableSelectionOnClick

@@ -311,7 +311,7 @@ const MainLayout = ({ children, title, breadcrumbs = [] }) => {
             })}
           </Breadcrumbs>
         )}
-        {children || <Outlet />}
+        {children }
       </Box>
     </Box>
   );

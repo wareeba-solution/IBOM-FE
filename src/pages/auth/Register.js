@@ -31,12 +31,13 @@ import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { useAuth } from '../../hooks/useAuth';
 import axios from 'axios';
+import api from '../../services/api';
 
 // Register page component
 const Register = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, roles, facilities, isLoading } = useAuth();
   
   // Form states
   const [showPassword, setShowPassword] = useState(false);
@@ -46,17 +47,19 @@ const Register = () => {
   const [success, setSuccess] = useState('');
   const [showAlert, setShowAlert] = useState(false);
   const [alertType, setAlertType] = useState('error');
-  const [facilities, setFacilities] = useState([]);
-  const [roles, setRoles] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  //const [facilities, setFacilities] = useState([]);
+  //const [roles, setRoles] = useState([]);
+  //const [isLoading, setIsLoading] = useState(true);
   
   // Fetch facilities and roles on component mount
-  useEffect(() => {
+  /*useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
+        //roles
+        //facilities
         // Mock data for development
-        setFacilities([
+        /*setFacilities([
           { id: '1', name: 'Akwa Ibom State Health Department' },
           { id: '2', name: 'University of Uyo Teaching Hospital' },
           { id: '3', name: 'Ibom Specialist Hospital' },
@@ -81,7 +84,7 @@ const Register = () => {
     };
     
     fetchData();
-  }, []);
+  }, []); */
 
   // Form validation schema
   const validationSchema = Yup.object({
@@ -142,7 +145,7 @@ const Register = () => {
       console.log('Submitting registration data:', registrationData);
       
       // Submit registration request
-      const response = await axios.post('http://localhost:3000/api/auth/register', registrationData);
+      const response = await api.post('/auth/register', registrationData);
       
       // Handle successful registration
       if (response.data && response.data.status === 'success') {
@@ -380,7 +383,7 @@ const Register = () => {
                       </MenuItem>
                       {roles.map((role) => (
                         <MenuItem key={role.id} value={role.id}>
-                          {role.displayName}
+                          {role.name}
                         </MenuItem>
                       ))}
                     </TextField>
@@ -402,7 +405,7 @@ const Register = () => {
                       <MenuItem value="" disabled>
                         Select your facility
                       </MenuItem>
-                      {facilities.map((facility) => (
+                      {facilities?.map((facility) => (
                         <MenuItem key={facility.id} value={facility.id}>
                           {facility.name}
                         </MenuItem>

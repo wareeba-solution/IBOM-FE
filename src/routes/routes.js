@@ -131,16 +131,16 @@ const AppRoutes = () => {
         <Route path="immunizations/statistics" element={<ImmunizationStatistics />} />
 
         {/* Antenatal routes */}
-        <Route path="antenatal" element={<AntenatalDetail />} />
+        <Route path="antenatal" element={<AntenatalList />} />
         <Route path="antenatal/new" element={<AntenatalForm />} />
-        <Route path="antenatal/:id" element={<AntenatalList />} />
+        <Route path="antenatal/:id" element={<AntenatalDetail />} />
         <Route path="antenatal/:id/edit" element={<AntenatalForm />} />
         <Route path="antenatal/statistics" element={<AntenatalStatistics />} />
 
         {/* Disease routes */}
-        <Route path="diseases" element={<DiseaseDetail />} />
+        <Route path="diseases" element={<DiseaseList />} />
         <Route path="diseases/new" element={<DiseaseForm />} />
-        <Route path="diseases/:id" element={<DiseaseList />} />
+        <Route path="diseases/:id" element={<DiseaseDetail />} />
         <Route path="diseases/:id/edit" element={<DiseaseForm />} />
         <Route path="diseases/statistics" element={<DiseaseStatistics />} />
 

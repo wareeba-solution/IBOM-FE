@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import jwt_decode from 'jwt-decode';
 import authService, { TOKEN_KEY, USER_KEY } from '../services/authService';
 import axios from 'axios';
+import api from '../services/api';
 
 export const AuthContext = createContext();
 
@@ -12,6 +13,9 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [roles, setRoles] = useState([]);
+  const [facilities, setFacilities] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -44,6 +48,74 @@ export const AuthProvider = ({ children }) => {
     verifyToken();
   }, [token]);
 
+  useEffect(() => {
+    if (!user) return;      // don’t run until we have a user
+
+    const fetchRoles = async () => {
+      setIsLoading(true);
+      try {
+        const response = await api.get(
+          '/roles',
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+        setRoles(response.data.data);
+        console.log('Fetched roles:', response.data.data);
+      } catch (err) {
+        if (err.response?.status === 429) {
+          console.warn('Rate limited: please wait before retrying.');
+        } else {
+          console.error('Error fetching roles:', err);
+        }
+      }finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRoles();
+  // ← only re-run if `user` or `token` changes
+  }, [user, token]);
+
+
+  useEffect(() => {
+    console.log('getRoles:', roles);
+  }, [roles]);
+  
+  useEffect(() => {
+    if (!user) return;      // don’t run until we have a user
+
+      const fetchFacilities = async () => {
+      setIsLoading(true);
+      try {
+        const response = await api.get(
+          '/facilities',
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+        setFacilities(response.data.data.facilities);
+        console.log('Fetched roles:', response.data.data);
+      } catch (err) {
+        if (err.response?.status === 429) {
+          console.warn('Rate limited: please wait before retrying.');
+        } else {
+          console.error('Error fetching roles:', err);
+        }
+        }finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFacilities();
+  // ← only re-run if `user` or `token` changes
+  }, [user, token]);
+
+
+  useEffect(() => {
+    console.log('getFacilities:', facilities);
+  },[facilities]);
+
   // Login function
   const login = async (credentials) => {
     try {
@@ -53,7 +125,7 @@ export const AuthProvider = ({ children }) => {
       console.log("Login attempt with:", credentials.email);
       
       // Make the login request
-      const response = await axios.post('http://localhost:3000/api/auth/login', credentials);
+      const response = await api.post('/auth/login', credentials);
       console.log("Login response:", response.data);
       
       // Extract token and user from response
@@ -108,7 +180,7 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       
       //const response = await authService.register(userData);
-      const response = await axios.post('http://localhost:3000/api/auth/register', userData);
+      const response = await api.post('/auth/register', userData);
       console.log("Registration response:", response.data);
       return { success: true, data: response };
     } catch (err) {
@@ -206,7 +278,10 @@ export const AuthProvider = ({ children }) => {
     requestPasswordReset,
     resetPassword,
     updateProfile,
-    hasRole
+    hasRole,
+    roles,
+    facilities,
+    isLoading
   };
 
   return (

@@ -615,7 +615,7 @@ const FacilitiesList = () => {
               onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
               onPageChange={(newPage) => setPage(newPage)}
               rowCount={totalFacilities}
-              paginationMode="server"
+              paginationMode="client"
               page={page}
               autoHeight
               disableSelectionOnClick

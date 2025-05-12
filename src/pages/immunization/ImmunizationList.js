@@ -658,7 +658,7 @@ const ImmunizationList = () => {
               onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
               onPageChange={(newPage) => setPage(newPage)}
               rowCount={totalImmunizations}
-              paginationMode="server"
+              paginationMode="client"
               page={page}
               autoHeight
               disableSelectionOnClick

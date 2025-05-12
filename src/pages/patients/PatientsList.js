@@ -497,7 +497,7 @@ const PatientsList = () => {
               onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
               onPageChange={(newPage) => setPage(newPage)}
               rowCount={totalPatients}
-              paginationMode="server"
+              paginationMode="client"
               page={page}
               autoHeight
               disableSelectionOnClick

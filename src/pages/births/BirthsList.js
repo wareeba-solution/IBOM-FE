@@ -586,7 +586,7 @@ const BirthsList = () => {
               onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
               onPageChange={(newPage) => setPage(newPage)}
               rowCount={totalBirths}
-              paginationMode="server"
+              paginationMode="client"
               page={page}
               autoHeight
               disableSelectionOnClick
