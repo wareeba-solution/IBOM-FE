@@ -679,7 +679,7 @@ const AntenatalList = () => {
             <CircularProgress />
           </Box>
         ) : viewMode === 'table' ? (
-          <Box sx={{ height: 600, width: '100%' }}>
+          <Box sx={{ width: '100%' }}>
             <DataGrid
               rows={antenatalRecords}
               columns={columns}
