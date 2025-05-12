@@ -615,7 +615,7 @@ const DeathsList = () => {
             <CircularProgress />
           </Box>
         ) : viewMode === 'table' ? (
-          <Box sx={{ height: 600, width: '100%' }}>
+          <Box sx={{ width: '100%' }}>
             <DataGrid
               rows={deaths}
               columns={columns}
