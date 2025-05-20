@@ -39,7 +39,7 @@ import {
 } from '@mui/icons-material';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import MainLayout from '../../components/common/Layout/MainLayout';
-import patientService from '../../services/patientService';
+import patientService, { getAllPatients } from '../../services/patientService';
 import { useApi } from '../../hooks/useApi';
 
 const PatientsList = () => {
@@ -52,7 +52,7 @@ const PatientsList = () => {
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
   const [filters, setFilters] = useState({
     gender: '',
-    ageGroup: '',
+    dateOfBirth: '',
     location: '',
     status: 'active'
   });
@@ -73,7 +73,7 @@ const PatientsList = () => {
     };
 
     const result = await execute(
-      patientService.getAllPatients,
+      /*patientService.getAllPatients*/getAllPatients,
       [queryParams],
       (response) => {
         setPatients(response.data);
@@ -81,10 +81,15 @@ const PatientsList = () => {
       }
     );
 
+    const response = await getAllPatients(queryParams)
+    const mockPatients = response.data
+    console.log('Mock patients:', mockPatients);
+    console.log('Patients fetched:', result);
+
     // In development, using mock data
-    if (!result.success) {
+    if (mockPatients) {
       // Mock data for development
-      const mockPatients = Array.from({ length: 50 }, (_, i) => ({
+      /*const mockPatients = Array.from({ length: 50 }, (_, i) => ({
         id: i + 1,
         registration_number: `PAT${1000 + i}`,
         full_name: `Patient ${i + 1}`,
@@ -96,9 +101,9 @@ const PatientsList = () => {
         status: i % 10 === 0 ? 'inactive' : 'active',
         last_visit: i % 5 === 0 ? null : new Date(2023, i % 12, i % 28 + 1).toISOString().split('T')[0],
         created_at: new Date(2022, i % 12, i % 28 + 1).toISOString()
-      }));
+      }));*/
       
-      setPatients(mockPatients);
+      setPatients(mockPatients.patients);
       setTotalPatients(mockPatients.length);
     }
   };
@@ -189,11 +194,11 @@ const PatientsList = () => {
 
   // Table columns
   const columns = [
-    { field: 'registration_number', headerName: 'Reg. No.', width: 120 },
-    { field: 'full_name', headerName: 'Patient Name', width: 200 },
+    { field: 'uniqueIdentifier', headerName: 'Reg. No.', width: 120 },
+    { field: 'firstName', headerName: 'Patient Name', width: 200 },
     { field: 'gender', headerName: 'Gender', width: 100 },
     { 
-      field: 'date_of_birth', 
+      field: 'dateOfBirth', 
       headerName: 'DOB / Age', 
       width: 120,
       valueGetter: (params) => {
@@ -211,7 +216,7 @@ const PatientsList = () => {
         return `${params.value} (${age}y)`;
       }
     },
-    { field: 'phone', headerName: 'Phone', width: 150 },
+    { field: 'phoneNumber', headerName: 'Phone', width: 150 },
     { field: 'address', headerName: 'Address', width: 200 },
     { 
       field: 'status', 
@@ -274,7 +279,7 @@ const PatientsList = () => {
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                   <Typography variant="h6" noWrap>
-                    {patient.full_name}
+                    {patient.firstName}
                   </Typography>
                   <Chip 
                     label={patient.status} 
@@ -284,16 +289,16 @@ const PatientsList = () => {
                   />
                 </Box>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  <strong>Reg No:</strong> {patient.registration_number}
+                  <strong>Reg No:</strong> {patient.uniqueIdentifier}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
                   <strong>Gender:</strong> {patient.gender}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  <strong>DOB:</strong> {patient.date_of_birth}
+                  <strong>DOB:</strong> {patient.dateOfBirth}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  <strong>Phone:</strong> {patient.phone}
+                  <strong>Phone:</strong> {patient.phoneNumber}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" noWrap>
                   <strong>Address:</strong> {patient.address}
@@ -379,16 +384,16 @@ const PatientsList = () => {
                   label="Gender"
                 >
                   <MenuItem value="">All</MenuItem>
-                  <MenuItem value="Male">Male</MenuItem>
-                  <MenuItem value="Female">Female</MenuItem>
+                  <MenuItem value="male">Male</MenuItem>
+                  <MenuItem value="female">Female</MenuItem>
                 </Select>
               </FormControl>
               
               <FormControl fullWidth margin="dense" size="small">
                 <InputLabel>Age Group</InputLabel>
                 <Select
-                  name="ageGroup"
-                  value={filters.ageGroup}
+                  name="dateOfBirth"
+                  value={filters.dateOfBirth}
                   onChange={handleFilterChange}
                   label="Age Group"
                 >

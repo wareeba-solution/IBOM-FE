@@ -1,11 +1,17 @@
 // src/services/api.js
+import React from 'react';
 import axios from 'axios';
+import useAuth from '../hooks/useAuth';
+//const {token} = useAuth()
 
 // Create base axios instance
+
+const token = localStorage.getItem('akwa_ibom_health_token');
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3000/api',
   headers: {
     'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
   },
 });
 

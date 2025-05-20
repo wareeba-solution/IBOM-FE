@@ -42,26 +42,27 @@ import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
-import patientService from '../../services/patientService';
+import patientService, { createPatient, getPatientById, updatePatient } from '../../services/patientService';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { format } from 'date-fns';
+import useAuth from '../../hooks/useAuth';
 
 // Patient form validation schema
 const patientValidationSchema = Yup.object({
-  first_name: Yup.string()
+  firstName: Yup.string()
     .required('First name is required')
     .min(2, 'First name must be at least 2 characters'),
-  last_name: Yup.string()
+  lastName: Yup.string()
     .required('Last name is required')
     .min(2, 'Last name must be at least 2 characters'),
   gender: Yup.string()
     .required('Gender is required'),
-  date_of_birth: Yup.date()
+  dateOfBirth: Yup.date()
     .required('Date of birth is required')
     .max(new Date(), 'Date of birth cannot be in the future'),
-  phone_number: Yup.string()
+  phoneNumber: Yup.string()
     .matches(/^[0-9+\s()-]{10,15}$/, 'Invalid phone number format')
     .nullable(),
   address: Yup.string()
@@ -70,52 +71,61 @@ const patientValidationSchema = Yup.object({
     .required('City is required'),
   state: Yup.string()
     .required('State is required'),
-  postal_code: Yup.string()
+  lgaResidence: Yup.string()
+    .required('Lga Residence is required'),
+  lgaOrigin: Yup.string()
+    .required('Lga Origin is required'),
+  postalCode: Yup.string()
     .nullable(),
   email: Yup.string()
     .email('Invalid email format')
     .nullable(),
-  blood_group: Yup.string()
+  bloodGroup: Yup.string()
     .nullable(),
   genotype: Yup.string()
     .nullable(),
-  marital_status: Yup.string()
+  maritalStatus: Yup.string()
     .nullable(),
   occupation: Yup.string()
     .nullable(),
-  next_of_kin_name: Yup.string()
+  emergencyContactRelationship: Yup.string()
     .nullable(),
-  next_of_kin_relationship: Yup.string()
+  emergencyContactName: Yup.string()
     .nullable(),
-  next_of_kin_phone: Yup.string()
+ // emergencyContactAddress: Yup.string()
+    //.nullable(),
+  emergencyContactPhone: Yup.string()
     .matches(/^[0-9+\s()-]{10,15}$/, 'Invalid phone number format')
     .nullable(),
-  registration_date: Yup.date()
+  registrationDate: Yup.date()
     .default(() => new Date())
 });
 
 // Patient form initial values
 const initialPatientValues = {
-  first_name: '',
-  last_name: '',
-  other_names: '',
+  firstName: '',
+  lastName: '',
+  otherNames: '',
   gender: '',
-  date_of_birth: null,
-  phone_number: '',
+  dateOfBirth: null,
+  phoneNumber: '',
   address: '',
-  city: '',
+  lgaOrigin: '',
+  lgaResidence: '',
   state: 'Akwa Ibom', // Default state
-  postal_code: '',
+  postalCode: '',
   email: '',
-  blood_group: '',
+  bloodGroup: '',
   genotype: '',
-  marital_status: '',
+  maritalStatus: '',
   occupation: '',
-  next_of_kin_name: '',
-  next_of_kin_relationship: '',
-  next_of_kin_phone: '',
-  registration_date: new Date(),
-  notes: '',
+ // emergencyContactName: '',
+  //emergencyContactRelationship: '',
+  //emergencyContactPhone: '',
+  //emergencyContactAddress: '',
+  registrationDate: new Date(),
+  medicalNotes: '',
+  facilityId: '',
   status: 'active'
 };
 
@@ -124,6 +134,8 @@ const PatientForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { loading, error, execute } = useApi();
+  const {facilities, roles} = useAuth();
+  
   
   // State
   const [patient, setPatient] = useState(null);
@@ -142,15 +154,15 @@ const PatientForm = () => {
     // Format date values
     const formattedValues = {
       ...values,
-      date_of_birth: values.date_of_birth ? format(new Date(values.date_of_birth), 'yyyy-MM-dd') : null,
-      registration_date: format(new Date(values.registration_date), 'yyyy-MM-dd')
+      dateOfBirth: values.dateOfBirth ? format(new Date(values.dateOfBirth), 'yyyy-MM-dd') : null,
+      registrationDate: format(new Date(values.registrationDate), 'yyyy-MM-dd')
     };
 
     try {
       if (isEditMode) {
         // Update existing patient
         await execute(
-          patientService.updatePatient,
+          /*patientService.updatePatient*/updatePatient,
           [id, formattedValues],
           (response) => {
             setAlertMessage('Patient updated successfully');
@@ -166,7 +178,7 @@ const PatientForm = () => {
       } else {
         // Create new patient
         await execute(
-          patientService.createPatient,
+          createPatient,
           [formattedValues],
           (response) => {
             setAlertMessage('Patient registered successfully');
@@ -174,9 +186,9 @@ const PatientForm = () => {
             setAlertOpen(true);
             
             // Navigate to the new patient's detail page
-            setTimeout(() => {
+           /* setTimeout(() => {
               navigate(`/patients/${response.id}`);
-            }, 1500);
+            }, 1500);*/
           }
         );
       }
@@ -202,18 +214,19 @@ const PatientForm = () => {
         setIsEditMode(true);
         
         await execute(
-          patientService.getPatientById,
+          /*patientService.getPatientById*/ getPatientById,
           [id],
           (response) => {
             // Transform API response to form values format
             const patientData = {
               ...initialPatientValues,
               ...response,
-              date_of_birth: response.date_of_birth ? new Date(response.date_of_birth) : null,
-              registration_date: response.registration_date ? new Date(response.registration_date) : new Date()
+              dateOfBirth: response.dateOfBirth ? new Date(response.dateOfBirth) : null,
+              registrationDate: response.registrationDate ? new Date(response.registrationDate) : new Date()
             };
             
             setPatient(patientData);
+            console.log('Patient data loaded:', patientData);
             
             // Set formik values
             Object.keys(patientData).forEach(key => {
@@ -272,36 +285,36 @@ const PatientForm = () => {
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
-                id="first_name"
-                name="first_name"
+                id="firstName"
+                name="firstName"
                 label="First Name *"
-                value={formik.values.first_name}
+                value={formik.values.firstName}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                error={formik.touched.first_name && Boolean(formik.errors.first_name)}
-                helperText={formik.touched.first_name && formik.errors.first_name}
+                error={formik.touched.firstName && Boolean(formik.errors.firstName)}
+                helperText={formik.touched.firstName && formik.errors.firstName}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
-                id="last_name"
-                name="last_name"
+                id="lastName"
+                name="lastName"
                 label="Last Name *"
-                value={formik.values.last_name}
+                value={formik.values.lastName}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                error={formik.touched.last_name && Boolean(formik.errors.last_name)}
-                helperText={formik.touched.last_name && formik.errors.last_name}
+                error={formik.touched.lastName && Boolean(formik.errors.lastName)}
+                helperText={formik.touched.lastName && formik.errors.lastName}
               />
             </Grid>
             <Grid item xs={12} sm={4}>
               <TextField
                 fullWidth
-                id="other_names"
-                name="other_names"
+                id="otherNames"
+                name="otherNames"
                 label="Other Names"
-                value={formik.values.other_names}
+                value={formik.values.otherNames}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
               />
@@ -324,8 +337,8 @@ const PatientForm = () => {
                   <MenuItem value="">
                     <em>Select Gender</em>
                   </MenuItem>
-                  <MenuItem value="Male">Male</MenuItem>
-                  <MenuItem value="Female">Female</MenuItem>
+                  <MenuItem value="male">Male</MenuItem>
+                  <MenuItem value="female">Female</MenuItem>
                 </Select>
                 {formik.touched.gender && formik.errors.gender && (
                   <FormHelperText>{formik.errors.gender}</FormHelperText>
@@ -336,16 +349,16 @@ const PatientForm = () => {
               <LocalizationProvider dateAdapter={AdapterDateFns}>
                 <DatePicker
                   label="Date of Birth *"
-                  value={formik.values.date_of_birth}
-                  onChange={(date) => formik.setFieldValue('date_of_birth', date)}
+                  value={formik.values.dateOfBirth}
+                  onChange={(date) => formik.setFieldValue('dateOfBirth', date)}
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       fullWidth
-                      name="date_of_birth"
+                      name="dateOfBirth"
                       onBlur={formik.handleBlur}
-                      error={formik.touched.date_of_birth && Boolean(formik.errors.date_of_birth)}
-                      helperText={formik.touched.date_of_birth && formik.errors.date_of_birth}
+                      error={formik.touched.dateOfBirth && Boolean(formik.errors.dateOfBirth)}
+                      helperText={formik.touched.dateOfBirth && formik.errors.dateOfBirth}
                       InputProps={{
                         endAdornment: (
                           <InputAdornment position="end">
@@ -363,19 +376,19 @@ const PatientForm = () => {
                 <InputLabel id="marital-status-label">Marital Status</InputLabel>
                 <Select
                   labelId="marital-status-label"
-                  id="marital_status"
-                  name="marital_status"
-                  value={formik.values.marital_status}
+                  id="maritalStatus"
+                  name="maritalStatus"
+                  value={formik.values.maritalStatus}
                   onChange={formik.handleChange}
                   label="Marital Status"
                 >
                   <MenuItem value="">
                     <em>Select Status</em>
                   </MenuItem>
-                  <MenuItem value="Single">Single</MenuItem>
-                  <MenuItem value="Married">Married</MenuItem>
-                  <MenuItem value="Divorced">Divorced</MenuItem>
-                  <MenuItem value="Widowed">Widowed</MenuItem>
+                  <MenuItem value="single">Single</MenuItem>
+                  <MenuItem value="married">Married</MenuItem>
+                  <MenuItem value="divorced">Divorced</MenuItem>
+                  <MenuItem value="widowed">Widowed</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -394,16 +407,16 @@ const PatientForm = () => {
               <LocalizationProvider dateAdapter={AdapterDateFns}>
                 <DatePicker
                   label="Registration Date *"
-                  value={formik.values.registration_date}
-                  onChange={(date) => formik.setFieldValue('registration_date', date)}
+                  value={formik.values.registrationDate}
+                  onChange={(date) => formik.setFieldValue('registrationDate', date)}
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       fullWidth
-                      name="registration_date"
+                      name="registrationDate"
                       onBlur={formik.handleBlur}
-                      error={formik.touched.registration_date && Boolean(formik.errors.registration_date)}
-                      helperText={formik.touched.registration_date && formik.errors.registration_date}
+                      error={formik.touched.registrationDate && Boolean(formik.errors.registrationDate)}
+                      helperText={formik.touched.registrationDate && formik.errors.registrationDate}
                       InputProps={{
                         endAdornment: (
                           <InputAdornment position="end">
@@ -424,14 +437,14 @@ const PatientForm = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                id="phone_number"
-                name="phone_number"
+                id="phoneNumber"
+                name="phoneNumber"
                 label="Phone Number"
-                value={formik.values.phone_number}
+                value={formik.values.phoneNumber}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                error={formik.touched.phone_number && Boolean(formik.errors.phone_number)}
-                helperText={formik.touched.phone_number && formik.errors.phone_number}
+                error={formik.touched.phoneNumber && Boolean(formik.errors.phoneNumber)}
+                helperText={formik.touched.phoneNumber && formik.errors.phoneNumber}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -503,16 +516,89 @@ const PatientForm = () => {
               </FormControl>
             </Grid>
             <Grid item xs={12} sm={4}>
-              <TextField
+              <FormControl 
                 fullWidth
-                id="postal_code"
-                name="postal_code"
-                label="Postal Code"
-                value={formik.values.postal_code}
+                error={formik.touched.lgaOrigin && Boolean(formik.errors.lgaOrigin)}
+              >
+                <InputLabel id="state-label">LGA Origin *</InputLabel>
+                <Select
+                  labelId="state-label"
+                  id="lgaOrigin"
+                  name="lgaOrigin"
+                  value={formik.values.lgaOrigin}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  label="LGA *"
+                >
+                  <MenuItem value="Okobo">Okobo</MenuItem>
+                  <MenuItem value="Cross River">Cross River</MenuItem>
+                  <MenuItem value="Rivers">Rivers</MenuItem>
+                  <MenuItem value="Abia">Ukog</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
+                </Select>
+                {formik.touched.lgaOrigin && formik.errors.lgaOrigin && (
+                  <FormHelperText>{formik.errors.lgaOrigin}</FormHelperText>
+                )}
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <FormControl 
+                fullWidth
+                error={formik.touched.lgaResidence && Boolean(formik.errors.lgaResidence)}
+              >
+                <InputLabel id="state-label">LGA Residence *</InputLabel>
+                <Select
+                  labelId="state-label"
+                  id="lgaResidence"
+                  name="lgaResidence"
+                  value={formik.values.lgaResidence}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  label="LGA Residence *"
+                >
+                  <MenuItem value="Uyo">Uyo</MenuItem>
+                  <MenuItem value="Cross River">Cross River</MenuItem>
+                  <MenuItem value="Rivers">Rivers</MenuItem>
+                  <MenuItem value="Abia">Ukog</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
+                </Select>
+                {formik.touched.lgaResidence && formik.errors.lgaResidence && (
+                  <FormHelperText>{formik.errors.lgaResidence}</FormHelperText>
+                )}
+              </FormControl>
+            </Grid>
+            <FormControl fullWidth margin="dense" size="small">
+              <InputLabel id="facility-label">Facility</InputLabel>
+              <Select
+                labelId="facility-label"
+                name="facilityId"
+                value={formik.values.facilityId}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                error={formik.touched.postal_code && Boolean(formik.errors.postal_code)}
-                helperText={formik.touched.postal_code && formik.errors.postal_code}
+                label="Facility"
+              >
+                <MenuItem value="">All Facilities</MenuItem>
+                {facilities.map((facility) => (
+                  <MenuItem key={facility.id} value={facility.id}>
+                    {facility.name}
+                  </MenuItem>
+                ))}
+              </Select>
+              {formik.touched.facilityId && formik.errors.facilityId && (
+                <FormHelperText>{formik.errors.facilityId}</FormHelperText>
+              )}
+            </FormControl>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                id="postalCode"
+                name="postalCode"
+                label="Postal Code"
+                value={formik.values.postalCode}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.postalCode && Boolean(formik.errors.postalCode)}
+                helperText={formik.touched.postalCode && formik.errors.postalCode}
               />
             </Grid>
           </Grid>
@@ -525,9 +611,9 @@ const PatientForm = () => {
                 <InputLabel id="blood-group-label">Blood Group</InputLabel>
                 <Select
                   labelId="blood-group-label"
-                  id="blood_group"
-                  name="blood_group"
-                  value={formik.values.blood_group}
+                  id="bloodGroup"
+                  name="bloodGroup"
+                  value={formik.values.bloodGroup}
                   onChange={formik.handleChange}
                   label="Blood Group"
                 >
@@ -570,12 +656,12 @@ const PatientForm = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                id="notes"
-                name="notes"
+                id="medicalNotes"
+                name="medicalNotes"
                 label="Medical Notes"
                 multiline
                 rows={4}
-                value={formik.values.notes}
+                value={formik.values.medicalNotes}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
                 placeholder="Enter any relevant medical history, allergies, or chronic conditions"
@@ -612,40 +698,40 @@ const PatientForm = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                id="next_of_kin_name"
-                name="next_of_kin_name"
+                id="emergencyContactName"
+                name="emergencyContactName"
                 label="Next of Kin Name"
-                value={formik.values.next_of_kin_name}
+                value={formik.values.emergencyContactName}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                error={formik.touched.next_of_kin_name && Boolean(formik.errors.next_of_kin_name)}
-                helperText={formik.touched.next_of_kin_name && formik.errors.next_of_kin_name}
+                error={formik.touched.emergencyContactName && Boolean(formik.errors.emergencyContactName)}
+                helperText={formik.touched.emergencyContactName && formik.errors.emergencyContactName}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                id="next_of_kin_relationship"
-                name="next_of_kin_relationship"
+                id="emergencyContactRelationship"
+                name="emergencyContactRelationship"
                 label="Relationship"
-                value={formik.values.next_of_kin_relationship}
+                value={formik.values.emergencyContactRelationship}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                error={formik.touched.next_of_kin_relationship && Boolean(formik.errors.next_of_kin_relationship)}
-                helperText={formik.touched.next_of_kin_relationship && formik.errors.next_of_kin_relationship}
+                error={formik.touched.emergencyContactRelationship && Boolean(formik.errors.emergencyContactRelationship)}
+                helperText={formik.touched.emergencyContactRelationship && formik.errors.emergencyContactRelationship}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                id="next_of_kin_phone"
-                name="next_of_kin_phone"
+                id="emergencyContactPhone"
+                name="emergencyContactPhone"
                 label="Phone Number"
-                value={formik.values.next_of_kin_phone}
+                value={formik.values.emergencyContactPhone}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                error={formik.touched.next_of_kin_phone && Boolean(formik.errors.next_of_kin_phone)}
-                helperText={formik.touched.next_of_kin_phone && formik.errors.next_of_kin_phone}
+                error={formik.touched.emergencyContactPhone && Boolean(formik.errors.emergencyContactPhone)}
+                helperText={formik.touched.emergencyContactPhone && formik.errors.emergencyContactPhone}
               />
             </Grid>
           </Grid>
@@ -659,14 +745,14 @@ const PatientForm = () => {
   const isStepComplete = (step) => {
     if (step === 0) {
       return (
-        formik.values.first_name &&
-        formik.values.last_name &&
+        formik.values.firstName &&
+        formik.values.lastName &&
         formik.values.gender &&
-        formik.values.date_of_birth &&
-        !formik.errors.first_name &&
-        !formik.errors.last_name &&
+        formik.values.dateOfBirth &&
+        !formik.errors.firstName &&
+        !formik.errors.lastName &&
         !formik.errors.gender &&
-        !formik.errors.date_of_birth
+        !formik.errors.dateOfBirth
       );
     } else if (step === 1) {
       return (
@@ -676,7 +762,7 @@ const PatientForm = () => {
         !formik.errors.address &&
         !formik.errors.city &&
         !formik.errors.state &&
-        !formik.errors.phone_number &&
+        !formik.errors.phoneNumber &&
         !formik.errors.email
       );
     }
@@ -687,10 +773,10 @@ const PatientForm = () => {
   // Determine if the form can be submitted
   const canSubmit = () => {
     return (
-      formik.values.first_name &&
-      formik.values.last_name &&
+      formik.values.firstName &&
+      formik.values.lastName &&
       formik.values.gender &&
-      formik.values.date_of_birth &&
+      formik.values.dateOfBirth &&
       formik.values.address &&
       formik.values.city &&
       formik.values.state &&

@@ -55,7 +55,7 @@ import {
 } from '@mui/icons-material';
 import { format, differenceInYears, parseISO } from 'date-fns';
 import MainLayout from '../../components/common/Layout/MainLayout';
-import patientService from '../../services/patientService';
+import patientService, { getPatientById } from '../../services/patientService';
 import { useApi } from '../../hooks/useApi';
 
 // Import form components
@@ -122,13 +122,14 @@ const PatientDetail = () => {
   useEffect(() => {
     const loadPatient = async () => {
       await execute(
-        patientService.getPatientById,
+        /*patientService.*/getPatientById,
         [id],
         (response) => {
           setPatient(response);
+          console.log("Patient loaded id from bend:", response);
         },
         (error) => {
-          console.error("Error loading patient:", error);
+          //console.error("Error loading patient:", error);
           // If API request fails in development, create mock data
           if (process.env.NODE_ENV === 'development') {
             const mockPatient = createMockPatient(id);
@@ -139,12 +140,20 @@ const PatientDetail = () => {
     };
     
     loadPatient();
-  }, [id, execute]);
+  }, [id, execute]); 
+
+  
+  console.log("Patient loaded id from bend:", patient);
 
   // Create mock patient for development
   const createMockPatient = (patientId) => {
     // Convert id to number
     const numId = parseInt(patientId, 10);
+    const year = 1980 + (numId % 40);
+    const month = numId % 12;
+    const day = (numId % 28) + 1;
+
+    const dob = new Date(year, month, day);
     
     return {
       id: numId,
@@ -153,7 +162,9 @@ const PatientDetail = () => {
       last_name: `Last${numId}`,
       other_names: numId % 3 === 0 ? `Middle${numId}` : '',
       gender: numId % 2 === 0 ? 'Male' : 'Female',
-      date_of_birth: new Date(1980 + numId % 40, numId % 12, numId % 28 + 1).toISOString().split('T')[0],
+      date_of_birth: !isNaN(dob.getTime())
+      ? dob.toISOString().split('T')[0]
+      : "1990-01-01",
       phone_number: `080${numId}${numId}${numId}${numId}${numId}${numId}`,
       email: numId % 2 === 0 ? `patient${numId}@example.com` : '',
       address: `Address ${numId}, Akwa Ibom`,
@@ -168,7 +179,7 @@ const PatientDetail = () => {
       next_of_kin_phone: numId % 3 === 0 ? '' : `070${numId}${numId}${numId}${numId}${numId}${numId}`,
       notes: numId % 5 === 0 ? 'Patient has a history of hypertension. Regular checkups recommended.' : '',
       status: numId % 10 === 0 ? 'inactive' : 'active',
-      registration_date: new Date(2022, numId % 12, numId % 28 + 1).toISOString().split('T')[0]
+      //registration_date: new Date(2022, numId % 12, numId % 28 + 1).toISOString().split('T')[0]
     };
   };
 
@@ -538,10 +549,10 @@ const PatientDetail = () => {
 
   return (
     <MainLayout 
-      title={`Patient: ${patient.first_name} ${patient.last_name}`}
+      title={`Patient: ${patient.firstName} ${patient.lastName}`}
       breadcrumbs={[
         { name: 'Patients', path: '/patients' },
-        { name: `${patient.first_name} ${patient.last_name}`, active: true }
+        { name: `${patient.firstName} ${patient.lastName}`, active: true }
       ]}
     >
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -622,8 +633,8 @@ const PatientDetail = () => {
                     <PersonIcon />
                   </Avatar>
                 }
-                title={`${patient.first_name} ${patient.last_name} ${patient.other_names || ''}`}
-                subheader={`Registration No: ${patient.registration_number || 'PAT' + id}`}
+                title={`${patient.firstName} ${patient.lastName} ${patient.otherNames || ''}`}
+                subheader={`Registration No: ${patient.uniqueIdentifier || 'PAT' + patient.id}`}
                 action={
                   <Chip 
                     label={patient.status} 
@@ -651,7 +662,7 @@ const PatientDetail = () => {
                     </ListItemIcon>
                     <ListItemText 
                       primary="Date of Birth" 
-                      secondary={`${formatDate(patient.date_of_birth)} (${calculateAge(patient.date_of_birth)})`} 
+                      secondary={`${formatDate(patient.dateOfBirth)} (${calculateAge(patient.dateOfBirth)})`} 
                     />
                   </ListItem>
                   <ListItem>
@@ -660,7 +671,7 @@ const PatientDetail = () => {
                     </ListItemIcon>
                     <ListItemText 
                       primary="Blood Group" 
-                      secondary={patient.blood_group || 'Not available'} 
+                      secondary={patient.bloodGroup || 'Not available'} 
                     />
                   </ListItem>
                   <ListItem>
@@ -678,7 +689,7 @@ const PatientDetail = () => {
                     </ListItemIcon>
                     <ListItemText 
                       primary="Marital Status" 
-                      secondary={patient.marital_status || 'Not specified'} 
+                      secondary={patient.maritalStatus || 'Not specified'} 
                     />
                   </ListItem>
                   <ListItem>
@@ -687,7 +698,7 @@ const PatientDetail = () => {
                     </ListItemIcon>
                     <ListItemText 
                       primary="Registration Date" 
-                      secondary={formatDate(patient.registration_date)} 
+                      secondary={formatDate(patient.registrationDate)} 
                     />
                   </ListItem>
                 </List>
@@ -708,7 +719,7 @@ const PatientDetail = () => {
                       Phone Number
                     </Typography>
                     <Typography variant="body1" gutterBottom>
-                      {patient.phone_number || 'Not provided'}
+                      {patient.phoneNumber || 'Not provided'}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6}>
@@ -824,7 +835,7 @@ const PatientDetail = () => {
             <CardContent>
               {patient.notes ? (
                 <Typography variant="body1">
-                  {patient.notes}
+                  {patient.medicalNotes}
                 </Typography>
               ) : (
                 <Typography variant="body2" color="text.secondary">

@@ -51,10 +51,12 @@ import {
 import { DataGrid } from '@mui/x-data-grid';
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
+import useAuth from '../../hooks/useAuth';
+import api from '../../services/api';
 
 // Mock facility service - replace with actual service when available
 const facilityService = {
-  getAllFacilities: async (params) => {
+  /*getAllFacilities: async (params) => {
     // Simulate API call
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -68,6 +70,41 @@ const facilityService = {
         });
       }, 500);
     });
+  },*/
+   getAllFacilities: async (params) => {
+    try {
+      const response = await api.get('/facilities', { params });
+      console.log('API Response facility:', response.data.data.facilities);
+      return {
+        data: response.data.data.facilities || [],
+        meta: response.meta || {
+          total: response.data?.length || 0,
+          page: params.page || 1,
+          per_page: params.per_page || 10
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching facilities:', error);
+      // Return empty data but maintain structure to prevent UI errors
+      return {
+        data: [],
+        meta: {
+          total: 0,
+          page: params.page || 1,
+          per_page: params.per_page || 10
+        }
+      };
+    }
+  },
+  
+  getFacilityById: async (id) => {
+    try {
+      const response = await api.get(`/facilities/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching facility ${id}:`, error);
+      throw error;
+    }
   },
   deleteFacility: async (id) => {
     // Simulate API call
@@ -134,6 +171,7 @@ const FacilitiesList = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
   const [tabValue, setTabValue] = useState(0);
+  //const {facilities} = useAuth()
 
   // Fetch facilities data
   const fetchFacilities = async () => {
@@ -149,6 +187,7 @@ const FacilitiesList = () => {
       [queryParams],
       (response) => {
         setFacilities(response.data);
+        console.log('Facilities:', facilities);
         setTotalFacilities(response.meta.total);
       }
     );
@@ -343,11 +382,11 @@ const FacilitiesList = () => {
                   <Typography variant="body2" color="text.secondary" gutterBottom>
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                       <HospitalIcon fontSize="small" sx={{ mr: 1 }} />
-                      {facility.type} ({facility.level})
+                      {facility.facilityType} ({facility.level})
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                       <LocationIcon fontSize="small" sx={{ mr: 1 }} />
-                      {facility.city}, {facility.state}
+                      {facility.lga}, {facility.state}
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                       <PhoneIcon fontSize="small" sx={{ mr: 1 }} />

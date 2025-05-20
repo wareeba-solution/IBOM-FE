@@ -62,10 +62,83 @@ import {
 } from '@mui/icons-material';
 import { format, parseISO } from 'date-fns';
 import { useApi } from '../../hooks/useApi';
+import api from '../../services/api';
+
+
 
 // Mock user management service - replace with actual service when available
-const userManagementService = {
+import axios from 'axios';
+import useAuth from '../../hooks/useAuth';
+//import api from '../../services/api';
+
+const API_BASE_URL = '/api/users'; // Adjust this to match your backend route
+
+/*const userManagementService = {
   getAllUsers: async (params) => {
+    try {
+      const response = await axios.get(API_BASE_URL, {
+        params: {
+          search: params.search || '',
+          role: params.role || '',
+          status: params.status || '',
+          facility: params.facility || '',
+          page: params.page || 0,
+          pageSize: params.pageSize || 10,
+        },
+      });
+
+      return {
+        data: response.data.data,
+        total: response.data.total,
+      };
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      return { data: [], total: 0 };
+    }
+  },
+
+  getUserById: async (id) => {
+    const response = await axios.get(`${API_BASE_URL}/${id}`);
+    return response.data;
+  },
+
+  createUser: async (userData) => {
+    const response = await axios.post(API_BASE_URL, userData);
+    return response.data;
+  },
+
+  updateUser: async (id, userData) => {
+    const response = await axios.put(`${API_BASE_URL}/${id}`, userData);
+    return response.data;
+  },
+
+  deleteUser: async (id) => {
+    await axios.delete(`${API_BASE_URL}/${id}`);
+    return { success: true };
+  },
+
+  toggleUserStatus: async (id, isActive) => {
+    const response = await axios.patch(`${API_BASE_URL}/${id}/status`, { isActive });
+    return response.data;
+  },
+
+  resetPassword: async (id) => {
+    const response = await axios.post(`${API_BASE_URL}/${id}/reset-password`);
+    return response.data;
+  },
+
+  exportUsers: async () => {
+    const response = await axios.get(`${API_BASE_URL}/export`, {
+      responseType: 'blob', // for downloading files if needed
+    });
+    return response.data;
+  },
+};
+
+export default userManagementService */
+
+const userManagementService = {
+  /*getAllUsers: async (params) => {
     // Simulate API call
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -110,8 +183,52 @@ const userManagementService = {
         });
       }, 500);
     });
+  },*/
+  getAllUsers: async (params) => {
+    try {
+      const response = await api.get('/users', {
+        params: {
+          search: params.search || '',
+          role: params.role || '',
+          status: params.status || '',
+          facility: params.facility || '',
+          page: params.page || 0,
+          pageSize: params.pageSize || 10,
+        },
+      });
+
+      console.log('API Response for users:', response.data.data.users); // Debugging line
+      return {
+      data: response.data.data.users, 
+      total: response.data.data.total,
+    };
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      return { data: [], total: 0 };
+    }
   },
+
   getUserById: async (id) => {
+    const response = await api.get(`/users/${id}`);
+    return response.data;
+  },
+
+  createUser: async (userData) => {
+    const response = await api.post('/users', { userData });
+    alert('User created successfully');
+    return response.data;
+  },
+
+  /*updateUser: async (id, userData) => {
+    const response = await api.put(`/users/${id}`, userData);
+    return response.data;
+  },
+
+  deleteUser: async (id) => {
+    await api.delete(`/users/${id}`);
+    return { success: true };
+  },*/
+  /*getUserById: async (id) => {
     // Simulate API call
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -123,8 +240,8 @@ const userManagementService = {
         }
       }, 300);
     });
-  },
-  createUser: async (userData) => {
+  },*/
+  /*createUser: async (userData) => {
     // Simulate API call
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -138,7 +255,7 @@ const userManagementService = {
         resolve(newUser);
       }, 700);
     });
-  },
+  },*/
   updateUser: async (id, userData) => {
     // Simulate API call
     return new Promise((resolve, reject) => {
@@ -203,6 +320,7 @@ const userManagementService = {
   }
 };
 
+
 // Mock user roles
 const userRoles = [
   { id: 'admin', name: 'Administrator', icon: <AdminIcon color="error" /> },
@@ -212,7 +330,7 @@ const userRoles = [
 ];
 
 // Mock facilities
-const facilities = [
+/*const facilities = [
   'Uyo General Hospital',
   'Ikot Ekpene Health Center',
   'Eket General Hospital',
@@ -220,7 +338,7 @@ const facilities = [
   'Abak Health Center',
   'Ministry of Health HQ',
   'Central Admin Office'
-];
+];*/
 
 // Mock users data
 const mockUsers = [
@@ -374,6 +492,7 @@ const mockUsers = [
 const UserManagement = () => {
   const navigate = useNavigate();
   const { loading, error, execute } = useApi();
+  const {facilities, roles} = useAuth();
 
   // State
   const [users, setUsers] = useState([]);
@@ -393,7 +512,8 @@ const UserManagement = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
   const [userFormData, setUserFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     username: '',
     email: '',
     role: '',
@@ -921,13 +1041,13 @@ const UserManagement = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {users.map((user) => (
+                {users?.map((user) => (
                   <TableRow key={user.id} hover>
-                    <TableCell>{user.name}</TableCell>
+                    <TableCell>{`${user.firstName} ${user.lastName}`}</TableCell>
                     <TableCell>{user.username}</TableCell>
                     <TableCell>{user.email}</TableCell>
-                    <TableCell>{getRoleDisplay(user.role)}</TableCell>
-                    <TableCell>{user.facility}</TableCell>
+                    <TableCell>{user.role.name}</TableCell>
+                    <TableCell>{user.facility.name}</TableCell>
                     <TableCell>
                       <Chip
                         label={user.isActive ? 'Active' : 'Inactive'}
@@ -984,7 +1104,7 @@ const UserManagement = () => {
             rowsPerPageOptions={[5, 10, 25, 50]}
           />
           
-          {users.length === 0 && (
+          {users?.length === 0 && (
             <Box sx={{ textAlign: 'center', py: 3 }}>
               <Typography variant="body1" color="text.secondary">
                 No users found.
@@ -1070,7 +1190,7 @@ const UserManagement = () => {
                   onChange={handleUserFormChange}
                   label="Role"
                 >
-                  {userRoles.map((role) => (
+                  {roles.map((role) => (
                     <MenuItem key={role.id} value={role.id}>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         {role.icon}
@@ -1102,7 +1222,7 @@ const UserManagement = () => {
                   label="Facility"
                 >
                   {facilities.map((facility) => (
-                    <MenuItem key={facility} value={facility}>{facility}</MenuItem>
+                    <MenuItem key={facility.id} value={facility}>{facility.name}</MenuItem>
                   ))}
                 </Select>
                 {formErrors.facility && (

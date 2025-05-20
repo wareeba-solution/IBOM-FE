@@ -2,7 +2,9 @@
 import axios from 'axios';
 
 // Base API URL
-const API_URL = process.env.REACT_APP_API_URL || 'https://api.akwaibomhealth.org/api';
+const API_URL = "http://localhost:3000/api" //'https://api.akwaibomhealth.org/api';
+console.log('API URL:', API_URL);
+console.log('Environment:', process.env.REACT_APP_API_BASE_URL);
 
 // Create axios instance with proper config
 const apiClient = axios.create({
@@ -83,10 +85,53 @@ apiClient.interceptors.response.use(
   }
 );
 
+
+export const createPatient = async (patientData) => {
+  try {
+    const response = await apiClient.post('/patients', patientData);
+    console.log('Patient created successfully:', response.data);
+    return response.data;
+    console.log('Patient created successfully:', response.data);
+  } catch (error) {
+    throw error;
+  }
+}
+
+export const getAllPatients = async (params) => {
+  try {
+    const response = await apiClient.get('/patients', { params });
+    return response.data;
+  } catch (error) {
+    // Mock data for development is handled in the interceptor
+    throw error;
+  }
+}
+
+export const getPatientById = async (id) => {
+  try {
+    const response = await apiClient.get(`/patients/${id}`);
+    console.log('Patient data response:', response.data);
+    return response.data.data;
+  } catch (error) {
+    // Mock data for development is handled in the interceptor
+    throw error;
+  }
+}
+
+export const updatePatient = async (id, patientData) => {
+  try {
+    const response = await apiClient.put(`/patients/${id}`, patientData);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+}
+  
+
 // Patient service methods
 const patientService = {
   // Get all patients with pagination and filters
-  getAllPatients: async (params) => {
+  /*getAllPatients: async (params) => {
     try {
       const response = await apiClient.get('/patients', { params });
       return response.data;
@@ -94,10 +139,10 @@ const patientService = {
       // Mock data for development is handled in the interceptor
       throw error;
     }
-  },
+  },*/
   
   // Get patient by ID
-  getPatientById: async (id) => {
+  /*getPatientById: async (id) => {
     try {
       const response = await apiClient.get(`/patients/${id}`);
       return response.data.data;
@@ -105,27 +150,29 @@ const patientService = {
       // Mock data for development is handled in the interceptor
       throw error;
     }
-  },
+  },*/
   
   // Create new patient
-  createPatient: async (patientData) => {
+  /*createPatient: async (patientData) => {
     try {
       const response = await apiClient.post('/patients', patientData);
+      console.log('Patient created successfully:', response.data);
       return response.data;
+      console.log('Patient created successfully:', response.data);
     } catch (error) {
       throw error;
     }
-  },
+  },*/
   
   // Update patient
-  updatePatient: async (id, patientData) => {
+  /*updatePatient: async (id, patientData) => {
     try {
       const response = await apiClient.put(`/patients/${id}`, patientData);
       return response.data;
     } catch (error) {
       throw error;
     }
-  },
+  },*/
   
   // Delete patient
   deletePatient: async (id) => {
