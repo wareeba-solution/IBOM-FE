@@ -104,7 +104,7 @@ const AppRoutes = () => {
         <Route path="dashboard" element={<Dashboard />} />
 
         {/* Add this route for API testing */}
-        <Route path="api-test" element={<ApiConnectionTest />} />
+  <Route path="api-test" element={<ApiConnectionTest />} />
 
         {/* Patient routes */}
         <Route path="patients" element={<PatientsList />} />

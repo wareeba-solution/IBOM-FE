@@ -3,7 +3,7 @@ import axios from 'axios';
 import { getToken, removeToken } from '../utils/helpers';
 
 // Get the API URL from environment variables
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 // Create axios instance with base URL
 const apiClient = axios.create({

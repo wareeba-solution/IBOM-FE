@@ -39,7 +39,7 @@ const ApiConnectionTest = () => {
     }
     
     // Default for development
-    return 'http://localhost:5000';
+    return 'http://localhost:5000/api';
   };
   
   const apiUrl = getApiUrl();

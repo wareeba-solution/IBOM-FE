@@ -51,7 +51,7 @@ const Login = () => {
     
     try {
       // Attempt to login - use the email from the form
-      const response = await axios.post('http://localhost:5000/api/auth/login', {
+      const response = await axios.post('http://localhost:300/api/auth/login', {
         email: values.email,
         password: values.password,
         remember_me: values.rememberMe

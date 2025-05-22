@@ -405,7 +405,6 @@ const Dashboard = () => {
               </Box>
             </CardContent>
           </Card>
-          <ApiConnectionTest />
         </Grid>
       </Grid>
     </MainLayout>

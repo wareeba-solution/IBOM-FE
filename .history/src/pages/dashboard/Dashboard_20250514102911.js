@@ -33,7 +33,6 @@ import {
 import { Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import MainLayout from '../../components/common/Layout/MainLayout';
-import ApiConnectionTest from '../../components/ApiConnectionTest';
 
 // Sample data - would be replaced with API calls in production
 const dashboardData = {
@@ -405,7 +404,6 @@ const Dashboard = () => {
               </Box>
             </CardContent>
           </Card>
-          <ApiConnectionTest />
         </Grid>
       </Grid>
     </MainLayout>
