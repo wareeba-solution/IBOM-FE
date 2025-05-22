@@ -1,7 +1,6 @@
 // src/routes.js
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import ApiConnectionTest from '../components/ApiConnectionTest';
 
 // Layouts
 import MainLayout from '../components/common/Layout/MainLayout';
@@ -102,9 +101,6 @@ const AppRoutes = () => {
       }>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
-
-        {/* Add this route for API testing */}
-        <Route path="api-test" element={<ApiConnectionTest />} />
 
         {/* Patient routes */}
         <Route path="patients" element={<PatientsList />} />

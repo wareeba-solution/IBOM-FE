@@ -1,25 +1,8 @@
 // src/components/ApiConnectionTest.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { 
-  Box, 
-  Typography, 
-  Paper, 
-  CircularProgress, 
-  Alert, 
-  Divider, 
-  Link,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText
-} from '@mui/material';
-import { 
-  CheckCircle, 
-  Error, 
-  Info, 
-  ArrowRight 
-} from '@mui/icons-material';
+import { Box, Typography, Paper, CircularProgress, Alert, Divider, Link, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
+import { CheckCircle, Error, Info, ArrowRight } from '@mui/icons-material';
 
 const ApiConnectionTest = () => {
   const [status, setStatus] = useState('checking');
@@ -49,9 +32,10 @@ const ApiConnectionTest = () => {
     
     const testConnection = async () => {
       try {
-        // Try the health endpoint with axios directly
+        // Try the health endpoint with axios directly (to bypass any interceptors)
         setStatus('checking');
         const healthResponse = await axios.get(`${apiUrl}/health`, {
+          withCredentials: true,
           headers: {
             'Content-Type': 'application/json',
           }
@@ -66,7 +50,9 @@ const ApiConnectionTest = () => {
         
         // If health endpoint fails, try the root API endpoint
         try {
+          setStatus('checking');
           const rootResponse = await axios.get(apiUrl, {
+            withCredentials: true,
             headers: {
               'Content-Type': 'application/json',
             }
@@ -97,39 +83,43 @@ const ApiConnectionTest = () => {
   }, [apiUrl]);
 
   return (
-    <Paper elevation={3} sx={{ p: 3, height: '100%' }}>
-      <Typography variant="h6" gutterBottom>
-        API Connection Status
+    <Paper elevation={3} sx={{ padding: 3, maxWidth: 800, mx: 'auto', my: 2 }}>
+      <Typography variant="h5" gutterBottom>
+        API Connection Test
       </Typography>
       
       <Box sx={{ my: 2 }}>
-        <Typography variant="body2" sx={{ mb: 1 }}>
+        <Typography variant="subtitle1">
           <strong>API URL:</strong> {apiUrl}
         </Typography>
         
+        <Typography variant="subtitle1">
+          <strong>Environment:</strong> {process.env.NODE_ENV || 'development'}
+        </Typography>
+        
         <Box sx={{ display: 'flex', alignItems: 'center', my: 1 }}>
-          <Typography variant="body2" sx={{ mr: 1 }}>
+          <Typography variant="subtitle1" sx={{ mr: 1 }}>
             <strong>Status:</strong>
           </Typography>
           
           {status === 'checking' && (
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <CircularProgress size={20} sx={{ mr: 1 }} />
-              <Typography variant="body2" color="text.secondary">Checking connection...</Typography>
+              <Typography color="text.secondary">Checking connection...</Typography>
             </Box>
           )}
           
           {status === 'success' && (
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <CheckCircle color="success" sx={{ mr: 1, fontSize: 20 }} />
-              <Typography variant="body2" color="success.main">Connected successfully!</Typography>
+              <CheckCircle color="success" sx={{ mr: 1 }} />
+              <Typography color="success.main">Connected successfully!</Typography>
             </Box>
           )}
           
           {status === 'error' && (
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Error color="error" sx={{ mr: 1, fontSize: 20 }} />
-              <Typography variant="body2" color="error.main">Connection failed</Typography>
+              <Error color="error" sx={{ mr: 1 }} />
+              <Typography color="error.main">Connection failed</Typography>
             </Box>
           )}
         </Box>
@@ -143,54 +133,68 @@ const ApiConnectionTest = () => {
       
       {serverInfo && (
         <Box sx={{ my: 2 }}>
-          <Typography variant="subtitle2" gutterBottom>Server Information</Typography>
-          <Paper variant="outlined" sx={{ p: 1, bgcolor: 'grey.50' }}>
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '0.75rem' }}>
+          <Typography variant="h6" gutterBottom>Server Information</Typography>
+          <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
               {JSON.stringify(serverInfo, null, 2)}
             </pre>
           </Paper>
         </Box>
       )}
       
-      {status === 'error' && (
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="subtitle2" gutterBottom>
-            Troubleshooting Tips
-          </Typography>
+      <Divider sx={{ my: 2 }} />
+      
+      <Box sx={{ mt: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Troubleshooting Tips
+        </Typography>
+        
+        <List dense>
+          <ListItem>
+            <ListItemIcon>
+              <ArrowRight color="primary" />
+            </ListItemIcon>
+            <ListItemText primary="Ensure the backend server is running on port 5000" />
+          </ListItem>
           
-          <List dense disablePadding>
-            <ListItem sx={{ py: 0.5 }}>
-              <ListItemIcon sx={{ minWidth: 30 }}>
-                <ArrowRight color="primary" fontSize="small" />
-              </ListItemIcon>
-              <ListItemText 
-                primary="Ensure the backend server is running on port 5000" 
-                primaryTypographyProps={{ variant: 'body2' }}
-              />
-            </ListItem>
-            
-            <ListItem sx={{ py: 0.5 }}>
-              <ListItemIcon sx={{ minWidth: 30 }}>
-                <ArrowRight color="primary" fontSize="small" />
-              </ListItemIcon>
-              <ListItemText 
-                primary="Check the browser console for CORS errors" 
-                primaryTypographyProps={{ variant: 'body2' }}
-              />
-            </ListItem>
-            
-            <ListItem sx={{ py: 0.5 }}>
-              <ListItemIcon sx={{ minWidth: 30 }}>
-                <ArrowRight color="primary" fontSize="small" />
-              </ListItemIcon>
-              <ListItemText 
-                primary="Verify the backend's CORS configuration includes localhost:3000" 
-                primaryTypographyProps={{ variant: 'body2' }}
-              />
-            </ListItem>
-          </List>
-        </Box>
-      )}
+          <ListItem>
+            <ListItemIcon>
+              <ArrowRight color="primary" />
+            </ListItemIcon>
+            <ListItemText primary="Check the browser console for CORS errors" />
+          </ListItem>
+          
+          <ListItem>
+            <ListItemIcon>
+              <ArrowRight color="primary" />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Verify that the backend has the correct CORS configuration for localhost:3000" 
+            />
+          </ListItem>
+          
+          <ListItem>
+            <ListItemIcon>
+              <ArrowRight color="primary" />
+            </ListItemIcon>
+            <ListItemText 
+              primary={
+                <span>
+                  Try accessing the API directly in a browser: 
+                  <Link 
+                    href={`${apiUrl}/health`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    sx={{ ml: 1 }}
+                  >
+                    {`${apiUrl}/health`}
+                  </Link>
+                </span>
+              } 
+            />
+          </ListItem>
+        </List>
+      </Box>
     </Paper>
   );
 };
