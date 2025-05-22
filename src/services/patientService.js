@@ -2,7 +2,8 @@
 import axios from 'axios';
 
 // Base API URL
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 console.log('API URL:', API_URL);
 console.log('Environment:', process.env.NODE_ENV);
 
