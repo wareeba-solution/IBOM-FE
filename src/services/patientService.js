@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 // Base API URL
-const API_URL = "http://localhost:3000/api" //'https://api.akwaibomhealth.org/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 console.log('API URL:', API_URL);
 console.log('Environment:', process.env.REACT_APP_API_BASE_URL);
 
