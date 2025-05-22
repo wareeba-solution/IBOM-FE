@@ -162,10 +162,7 @@ const Login = () => {
               Enter your credentials to access the system
             </Typography>
 
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              handleSubmit(formik.values); 
-              }}>
+            <form onSubmit={formik.handleSubmit}>
               <TextField
                 margin="normal"
                 fullWidth
