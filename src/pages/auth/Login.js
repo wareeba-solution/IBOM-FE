@@ -48,14 +48,17 @@ const Login = () => {
     setIsSubmitting(true);
     setError('');
     console.log("Form values:", values);
+    console.log("API URL being used:", process.env.NEXT_PUBLIC_API_URL);
     
     try {
       // Attempt to login - use the email from the form
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/login`, {
+
         email: values.email,
         password: values.password,
         remember_me: values.rememberMe
       });
+      console.log("Login response received:", response.data);
 
       const result = response.data?.data;
       
