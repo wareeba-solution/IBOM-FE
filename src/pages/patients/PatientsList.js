@@ -65,46 +65,39 @@ const PatientsList = () => {
 
   // Fetch patients data
   const fetchPatients = async () => {
-    const queryParams = {
-      page: page + 1,
-      per_page: pageSize,
-      search: searchTerm,
-      ...filters
-    };
-
-    const result = await execute(
-      /*patientService.getAllPatients*/getAllPatients,
-      [queryParams],
-      (response) => {
-        setPatients(response.data);
-        setTotalPatients(response.meta.total);
-      }
-    );
-
-    const response = await getAllPatients(queryParams)
-    const mockPatients = response.data
-    console.log('Mock patients:', mockPatients);
-    console.log('Patients fetched:', result);
-
-    // In development, using mock data
-    if (mockPatients) {
-      // Mock data for development
-      /*const mockPatients = Array.from({ length: 50 }, (_, i) => ({
-        id: i + 1,
-        registration_number: `PAT${1000 + i}`,
-        full_name: `Patient ${i + 1}`,
-        gender: i % 2 === 0 ? 'Male' : 'Female',
-        date_of_birth: new Date(1980 + i % 40, i % 12, i % 28 + 1).toISOString().split('T')[0],
-        phone: `080${i}${i}${i}${i}${i}${i}${i}${i}`,
-        address: `Address ${i + 1}, Akwa Ibom`,
-        location: i % 3 === 0 ? 'Urban' : 'Rural',
-        status: i % 10 === 0 ? 'inactive' : 'active',
-        last_visit: i % 5 === 0 ? null : new Date(2023, i % 12, i % 28 + 1).toISOString().split('T')[0],
-        created_at: new Date(2022, i % 12, i % 28 + 1).toISOString()
-      }));*/
+    try {
+      const queryParams = {
+        page: page + 1,
+        per_page: pageSize,
+        search: searchTerm,
+        ...filters
+      };
+  
+      console.log('🔍 Fetching patients with params:', queryParams);
       
-      setPatients(mockPatients.patients);
-      setTotalPatients(mockPatients.length);
+      const response = await getAllPatients(queryParams);
+      console.log('🔍 API Response:', response);
+      console.log('🔍 Response.data:', response.data);
+  
+      // Handle the response structure correctly
+      if (response && response.data) {
+        const { patients = [], totalItems = 0 } = response.data;
+        
+        console.log('🔍 Setting patients:', patients);
+        console.log('🔍 Setting total:', totalItems);
+        
+        setPatients(patients);
+        setTotalPatients(totalItems);
+      } else {
+        console.warn('Unexpected response structure:', response);
+        setPatients([]);
+        setTotalPatients(0);
+      }
+      
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+      setPatients([]);
+      setTotalPatients(0);
     }
   };
 
@@ -494,7 +487,7 @@ const PatientsList = () => {
         ) : viewMode === 'table' ? (
           <Box sx={{ width: '100%' }}>
             <DataGrid
-              rows={patients}
+              rows={patients || []}
               columns={columns}
               pageSize={pageSize}
               rowsPerPageOptions={[10, 20, 50]}
