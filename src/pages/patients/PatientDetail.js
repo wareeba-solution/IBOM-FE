@@ -123,7 +123,7 @@ const PatientDetail = () => {
 
 
   // Fetch patient data
-  uuseEffect(() => {
+  useEffect(() => {
     if (!id || hasLoadedOnce) return; // Prevent multiple loads
     
     const loadPatient = async () => {
