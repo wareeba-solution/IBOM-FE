@@ -118,29 +118,35 @@ const PatientDetail = () => {
     severity: 'success'
   });
 
+
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
+
   // Fetch patient data
-  useEffect(() => {
+  uuseEffect(() => {
+    if (!id || hasLoadedOnce) return; // Prevent multiple loads
+    
     const loadPatient = async () => {
       await execute(
-        /*patientService.*/getPatientById,
+        getPatientById,
         [id],
         (response) => {
           setPatient(response);
+          setHasLoadedOnce(true); // Mark as loaded
           console.log("Patient loaded id from bend:", response);
         },
         (error) => {
-          //console.error("Error loading patient:", error);
-          // If API request fails in development, create mock data
           if (process.env.NODE_ENV === 'development') {
             const mockPatient = createMockPatient(id);
             setPatient(mockPatient);
+            setHasLoadedOnce(true); // Mark as loaded even for mock
           }
         }
       );
     };
     
     loadPatient();
-  }, [id, execute]); 
+  }, [id, execute]);
 
   
   console.log("Patient loaded id from bend:", patient);
