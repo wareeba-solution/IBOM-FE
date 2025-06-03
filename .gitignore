@@ -7,3 +7,4 @@
 
 # Keep .env.example for reference
 !.env.example
+node_modules
