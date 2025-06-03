@@ -26,9 +26,6 @@ import {
   IconButton,
   Menu,
   MenuItem,
-  //PersonIcon,
-  //Healing,
-  //Home,
   Tabs,
   Tab
 } from '@mui/material';
@@ -42,64 +39,14 @@ import {
   MoreVert as MoreVertIcon,
   ChildCare as ChildIcon,
   Person as PersonIcon,
-  Home as HomeIcon,
+  LocalHospital as HospitalIcon,
   Healing as HealingIcon,
   AssignmentInd as AssignmentIcon
 } from '@mui/icons-material';
 import { format, parseISO } from 'date-fns';
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
-
-// Mock birth service - replace with actual service when available
-const birthService = {
-  getBirthById: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockBirth = {
-          id,
-          registration_number: `BR${10000 + parseInt(id)}`,
-          child_name: `Baby ${parseInt(id) % 2 === 0 ? 'Boy' : 'Girl'} ${id}`,
-          gender: parseInt(id) % 2 === 0 ? 'Male' : 'Female',
-          date_of_birth: new Date(2023, (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          place_of_birth: parseInt(id) % 3 === 0 ? 'Home' : 'Hospital',
-          birth_weight: (2.5 + Math.random() * 2).toFixed(2),
-          birth_length: (45 + Math.random() * 10).toFixed(1),
-          head_circumference: (30 + Math.random() * 5).toFixed(1),
-          hospital_name: parseInt(id) % 3 === 0 ? '' : `Hospital ${id}`,
-          mother_name: `Mother ${id}`,
-          mother_age: 20 + (parseInt(id) % 20),
-          mother_occupation: 'Teacher',
-          mother_id_number: `M${100000 + parseInt(id)}`,
-          mother_phone: `080${id}${id}${id}${id}${id}${id}${id}`,
-          father_name: `Father ${id}`,
-          father_age: 25 + (parseInt(id) % 20),
-          father_occupation: 'Engineer',
-          father_id_number: `F${100000 + parseInt(id)}`,
-          father_phone: `070${id}${id}${id}${id}${id}${id}${id}`,
-          address: `Address ${id}, Akwa Ibom`,
-          city: 'Uyo',
-          state: 'Akwa Ibom',
-          complications: parseInt(id) % 5 === 0 ? 'None' : '',
-          birth_attendant: parseInt(id) % 3 === 0 ? 'Midwife' : 'Doctor',
-          delivery_type: parseInt(id) % 4 === 0 ? 'Caesarean Section' : 'Normal',
-          status: parseInt(id) % 10 === 0 ? 'pending' : 'registered',
-          registration_date: new Date().toISOString().split('T')[0],
-          notes: parseInt(id) % 7 === 0 ? 'Special notes about this birth' : ''
-        };
-        resolve(mockBirth);
-      }, 500);
-    });
-  },
-  deleteBirth: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 300);
-    });
-  }
-};
+import birthService, { getBirthById } from '../../services/birthService';
 
 // Tab panel component
 function TabPanel(props) {
@@ -138,16 +85,19 @@ const BirthDetail = () => {
   useEffect(() => {
     const loadBirth = async () => {
       await execute(
-        birthService.getBirthById,
+        getBirthById,
         [id],
         (response) => {
           setBirth(response);
+          console.log("Birth record loaded:", response);
         }
       );
     };
     
-    loadBirth();
-  }, [id]);
+    if (id) {
+      loadBirth();
+    }
+  }, [id, execute]);
 
   // Handle tab change
   const handleTabChange = (event, newValue) => {
@@ -210,6 +160,20 @@ const BirthDetail = () => {
     }
   };
 
+  // Format time for display
+  const formatTime = (timeString) => {
+    if (!timeString) return 'N/A';
+    try {
+      // Assuming time format is HH:mm:ss
+      const [hours, minutes] = timeString.split(':');
+      const hour12 = hours % 12 || 12;
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      return `${hour12}:${minutes} ${ampm}`;
+    } catch (error) {
+      return timeString;
+    }
+  };
+
   if (loading && !birth) {
     return (
       <MainLayout title="Birth Record Details">
@@ -250,10 +214,10 @@ const BirthDetail = () => {
 
   return (
     <MainLayout 
-      title={`Birth Record: ${birth.child_name}`}
+      title={`Birth Record: Baby ${birth.gender} - ${formatDate(birth.birthDate)}`}
       breadcrumbs={[
         { name: 'Births', path: '/births' },
-        { name: birth.child_name, active: true }
+        { name: `Baby ${birth.gender} - ${formatDate(birth.birthDate)}`, active: true }
       ]}
     >
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -278,6 +242,7 @@ const BirthDetail = () => {
               startIcon={<PrintIcon />}
               onClick={handlePrintCertificate}
               sx={{ mr: 1 }}
+              disabled={!birth.isBirthCertificateIssued}
             >
               Print Certificate
             </Button>
@@ -311,7 +276,7 @@ const BirthDetail = () => {
                 </ListItemIcon>
                 <ListItemText primary="Edit Record" />
               </MenuItem>
-              <MenuItem onClick={handlePrintCertificate}>
+              <MenuItem onClick={handlePrintCertificate} disabled={!birth.isBirthCertificateIssued}>
                 <ListItemIcon>
                   <PrintIcon fontSize="small" />
                 </ListItemIcon>
@@ -343,15 +308,23 @@ const BirthDetail = () => {
         <Box sx={{ mb: 4 }}>
           <Card>
             <CardHeader
-              title={birth.child_name}
-              subheader={`Registration Number: ${birth.registration_number}`}
+              title={`Baby ${birth.gender} - Born ${formatDate(birth.birthDate)}`}
+              subheader={`Birth ID: ${birth.id}`}
               action={
-                <Chip 
-                  label={birth.status} 
-                  color={birth.status === 'registered' ? 'success' : 'warning'} 
-                  size="medium" 
-                  variant="outlined" 
-                />
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Chip 
+                    label={birth.isBirthCertificateIssued ? 'Certificate Issued' : 'Certificate Pending'} 
+                    color={birth.isBirthCertificateIssued ? 'success' : 'warning'} 
+                    size="medium" 
+                    variant="outlined" 
+                  />
+                  <Chip 
+                    label={birth.resuscitation ? 'Resuscitation Required' : 'Normal Birth'} 
+                    color={birth.resuscitation ? 'error' : 'success'} 
+                    size="medium" 
+                    variant="outlined" 
+                  />
+                </Box>
               }
             />
             <Divider />
@@ -362,32 +335,31 @@ const BirthDetail = () => {
                     Gender
                   </Typography>
                   <Typography variant="body1" gutterBottom>
-                    {birth.gender}
+                    {birth.gender ? birth.gender.charAt(0).toUpperCase() + birth.gender.slice(1) : 'Not specified'}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Date of Birth
+                    Birth Date
                   </Typography>
                   <Typography variant="body1" gutterBottom>
-                    {formatDate(birth.date_of_birth)}
+                    {formatDate(birth.birthDate)}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Place of Birth
+                    Birth Time
                   </Typography>
                   <Typography variant="body1" gutterBottom>
-                    {birth.place_of_birth}
-                    {birth.hospital_name && ` (${birth.hospital_name})`}
+                    {formatTime(birth.birthTime)}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Registration Date
+                    Birth Weight
                   </Typography>
                   <Typography variant="body1" gutterBottom>
-                    {formatDate(birth.registration_date)}
+                    {birth.birthWeight ? `${birth.birthWeight} kg` : 'Not recorded'}
                   </Typography>
                 </Grid>
               </Grid>
@@ -404,45 +376,44 @@ const BirthDetail = () => {
               variant="scrollable"
               scrollButtons="auto"
             >
-              <Tab icon={<ChildIcon />} iconPosition="start" label="Child Details" />
-              <Tab icon={<PersonIcon />} iconPosition="start" label="Parents Information" />
-              <Tab icon={<HealingIcon />} iconPosition="start" label="Birth Details" />
-              <Tab icon={<HomeIcon />} iconPosition="start" label="Address Information" />
-              <Tab icon={<AssignmentIcon />} iconPosition="start" label="Registration" />
+              <Tab icon={<ChildIcon />} iconPosition="start" label="Birth Details" />
+              <Tab icon={<PersonIcon />} iconPosition="start" label="Mother Information" />
+              <Tab icon={<HospitalIcon />} iconPosition="start" label="Medical Details" />
+              <Tab icon={<AssignmentIcon />} iconPosition="start" label="Certificate Status" />
             </Tabs>
           </Box>
 
-          {/* Child Details Tab */}
+          {/* Birth Details Tab */}
           <TabPanel value={tabValue} index={0}>
             <Card>
               <CardHeader
-                title="Child Details"
+                title="Birth Information"
               />
               <Divider />
               <CardContent>
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
-                      Full Name
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.child_name}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
                       Gender
                     </Typography>
                     <Typography variant="body1" gutterBottom>
-                      {birth.gender}
+                      {birth.gender ? birth.gender.charAt(0).toUpperCase() + birth.gender.slice(1) : 'Not specified'}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
-                      Date of Birth
+                      Birth Date
                     </Typography>
                     <Typography variant="body1" gutterBottom>
-                      {formatDate(birth.date_of_birth)}
+                      {formatDate(birth.birthDate)}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Birth Time
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {formatTime(birth.birthTime)}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
@@ -450,267 +421,332 @@ const BirthDetail = () => {
                       Birth Weight
                     </Typography>
                     <Typography variant="body1" gutterBottom>
-                      {birth.birth_weight} kg
+                      {birth.birthWeight ? `${birth.birthWeight} kg` : 'Not recorded'}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
-                      Birth Length
+                      Birth Type
                     </Typography>
                     <Typography variant="body1" gutterBottom>
-                      {birth.birth_length} cm
+                      {birth.birthType ? birth.birthType.charAt(0).toUpperCase() + birth.birthType.slice(1) : 'Not specified'}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
-                      Head Circumference
+                      Delivery Method
                     </Typography>
                     <Typography variant="body1" gutterBottom>
-                      {birth.head_circumference} cm
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Place of Birth
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.place_of_birth}
-                      {birth.hospital_name && ` (${birth.hospital_name})`}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </TabPanel>
-
-          {/* Parents Information Tab */}
-          <TabPanel value={tabValue} index={1}>
-            <Card sx={{ mb: 3 }}>
-              <CardHeader
-                title="Mother's Information"
-              />
-              <Divider />
-              <CardContent>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Mother's Name
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.mother_name}
+                      {birth.deliveryMethod ? birth.deliveryMethod.charAt(0).toUpperCase() + birth.deliveryMethod.slice(1) : 'Not specified'}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
-                      Mother's Age
+                      Facility ID
                     </Typography>
                     <Typography variant="body1" gutterBottom>
-                      {birth.mother_age} years
+                      {birth.facilityId || 'Not specified'}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
-                      Mother's Occupation
+                      Resuscitation Required
                     </Typography>
                     <Typography variant="body1" gutterBottom>
-                      {birth.mother_occupation || 'Not provided'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Mother's ID Number
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.mother_id_number || 'Not provided'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Mother's Phone Number
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.mother_phone || 'Not provided'}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader
-                title="Father's Information"
-              />
-              <Divider />
-              <CardContent>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Father's Name
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.father_name || 'Not provided'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Father's Age
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.father_age ? `${birth.father_age} years` : 'Not provided'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Father's Occupation
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.father_occupation || 'Not provided'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Father's ID Number
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.father_id_number || 'Not provided'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Father's Phone Number
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.father_phone || 'Not provided'}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </TabPanel>
-
-          {/* Birth Details Tab */}
-          <TabPanel value={tabValue} index={2}>
-            <Card>
-              <CardHeader
-                title="Birth Details"
-              />
-              <Divider />
-              <CardContent>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Delivery Type
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.delivery_type || 'Not specified'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Birth Attendant
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.birth_attendant || 'Not specified'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Complications
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.complications || 'None reported'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Additional Notes
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.notes || 'No additional notes'}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </TabPanel>
-
-          {/* Address Information Tab */}
-          <TabPanel value={tabValue} index={3}>
-            <Card>
-              <CardHeader
-                title="Address Information"
-              />
-              <Divider />
-              <CardContent>
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Address
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.address}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      City/Town
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.city}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      State
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.state}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </TabPanel>
-
-          {/* Registration Tab */}
-          <TabPanel value={tabValue} index={4}>
-            <Card>
-              <CardHeader
-                title="Registration Information"
-              />
-              <Divider />
-              <CardContent>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Registration Number
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {birth.registration_number}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Registration Date
-                    </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {formatDate(birth.registration_date)}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Status
-                    </Typography>
-                    <Box>
                       <Chip 
-                        label={birth.status} 
-                        color={birth.status === 'registered' ? 'success' : 'warning'} 
+                        label={birth.resuscitation ? 'Yes' : 'No'} 
+                        color={birth.resuscitation ? 'error' : 'success'} 
                         size="small" 
                         variant="outlined" 
                       />
-                    </Box>
+                    </Typography>
                   </Grid>
                 </Grid>
+              </CardContent>
+            </Card>
+          </TabPanel>
+
+          {/* Mother Information Tab */}
+          <TabPanel value={tabValue} index={1}>
+            <Card>
+              <CardHeader
+                title="Mother Information"
+              />
+              <Divider />
+              <CardContent>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Mother ID
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {birth.motherId || 'Not provided'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Full Name
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {birth.motherName || 'Not provided'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Age
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {birth.motherAge ? `${birth.motherAge} years` : 'Not provided'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      LGA of Origin
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {birth.motherLgaOrigin || 'Not provided'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      LGA of Residence
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {birth.motherLgaResidence || 'Not provided'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Parity (Number of Births)
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {birth.motherParity !== null && birth.motherParity !== undefined ? birth.motherParity : 'Not recorded'}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </TabPanel>
+
+          {/* Medical Details Tab */}
+          <TabPanel value={tabValue} index={2}>
+            <Card>
+              <CardHeader
+                title="Medical Assessment Details"
+              />
+              <Divider />
+              <CardContent>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      APGAR Score (1 minute)
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="h6" color={birth.apgarScoreOneMin >= 7 ? 'success.main' : birth.apgarScoreOneMin >= 4 ? 'warning.main' : 'error.main'}>
+                          {birth.apgarScoreOneMin !== null && birth.apgarScoreOneMin !== undefined ? birth.apgarScoreOneMin : 'N/A'}
+                        </Typography>
+                        {birth.apgarScoreOneMin !== null && birth.apgarScoreOneMin !== undefined && (
+                          <Chip 
+                            label={birth.apgarScoreOneMin >= 7 ? 'Good' : birth.apgarScoreOneMin >= 4 ? 'Fair' : 'Poor'} 
+                            color={birth.apgarScoreOneMin >= 7 ? 'success' : birth.apgarScoreOneMin >= 4 ? 'warning' : 'error'} 
+                            size="small" 
+                            variant="outlined" 
+                          />
+                        )}
+                      </Box>
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      APGAR Score (5 minutes)
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="h6" color={birth.apgarScoreFiveMin >= 7 ? 'success.main' : birth.apgarScoreFiveMin >= 4 ? 'warning.main' : 'error.main'}>
+                          {birth.apgarScoreFiveMin !== null && birth.apgarScoreFiveMin !== undefined ? birth.apgarScoreFiveMin : 'N/A'}
+                        </Typography>
+                        {birth.apgarScoreFiveMin !== null && birth.apgarScoreFiveMin !== undefined && (
+                          <Chip 
+                            label={birth.apgarScoreFiveMin >= 7 ? 'Good' : birth.apgarScoreFiveMin >= 4 ? 'Fair' : 'Poor'} 
+                            color={birth.apgarScoreFiveMin >= 7 ? 'success' : birth.apgarScoreFiveMin >= 4 ? 'warning' : 'error'} 
+                            size="small" 
+                            variant="outlined" 
+                          />
+                        )}
+                      </Box>
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Birth Weight
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="h6">
+                          {birth.birthWeight ? `${birth.birthWeight} kg` : 'Not recorded'}
+                        </Typography>
+                        {birth.birthWeight && (
+                          <Chip 
+                            label={
+                              birth.birthWeight >= 2.5 && birth.birthWeight <= 4.0 ? 'Normal' :
+                              birth.birthWeight < 2.5 ? 'Low' : 'High'
+                            }
+                            color={
+                              birth.birthWeight >= 2.5 && birth.birthWeight <= 4.0 ? 'success' :
+                              birth.birthWeight < 2.5 ? 'warning' : 'info'
+                            }
+                            size="small" 
+                            variant="outlined" 
+                          />
+                        )}
+                      </Box>
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Birth Type
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {birth.birthType ? birth.birthType.charAt(0).toUpperCase() + birth.birthType.slice(1) : 'Not specified'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Delivery Method
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {birth.deliveryMethod ? birth.deliveryMethod.charAt(0).toUpperCase() + birth.deliveryMethod.slice(1) : 'Not specified'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Resuscitation Required
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      <Chip 
+                        label={birth.resuscitation ? 'Yes - Required' : 'No - Not Required'} 
+                        color={birth.resuscitation ? 'error' : 'success'} 
+                        size="small" 
+                        variant="outlined" 
+                        icon={birth.resuscitation ? <HealingIcon /> : undefined}
+                      />
+                    </Typography>
+                  </Grid>
+                </Grid>
+
+                {/* APGAR Score Information */}
+                <Box sx={{ mt: 3, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    APGAR Score Reference
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    • <strong>7-10:</strong> Good condition (normal)<br/>
+                    • <strong>4-6:</strong> Fair condition (may need some resuscitative measures)<br/>
+                    • <strong>0-3:</strong> Poor condition (needs immediate resuscitation)
+                  </Typography>
+                </Box>
+
+                {/* Birth Weight Information */}
+                <Box sx={{ mt: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Birth Weight Reference
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    • <strong>2.5-4.0 kg:</strong> Normal birth weight<br/>
+                    • <strong>&lt;2.5 kg:</strong> Low birth weight<br/>
+                    • <strong>&gt;4.0 kg:</strong> High birth weight (macrosomia)
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </TabPanel>
+
+          {/* Certificate Status Tab */}
+          <TabPanel value={tabValue} index={3}>
+            <Card>
+              <CardHeader
+                title="Birth Certificate Status"
+              />
+              <Divider />
+              <CardContent>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Certificate Status
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      <Chip 
+                        label={birth.isBirthCertificateIssued ? 'Certificate Issued' : 'Certificate Not Issued'} 
+                        color={birth.isBirthCertificateIssued ? 'success' : 'warning'} 
+                        size="medium" 
+                        variant="outlined" 
+                      />
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Birth Record ID
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {birth.id}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Facility ID
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {birth.facilityId || 'Not specified'}
+                    </Typography>
+                  </Grid>
+                </Grid>
+
+                {!birth.isBirthCertificateIssued && (
+                  <Box sx={{ mt: 3, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
+                    <Typography variant="subtitle2" color="warning.dark" gutterBottom>
+                      Certificate Not Yet Issued
+                    </Typography>
+                    <Typography variant="body2" color="warning.dark">
+                      The birth certificate for this record has not been issued yet. Please contact the registrar's office to process the certificate.
+                    </Typography>
+                    <Box sx={{ mt: 2 }}>
+                      <Button 
+                        variant="contained" 
+                        color="warning" 
+                        size="small"
+                        onClick={() => {
+                          // Handle certificate request
+                          console.log('Request certificate for birth ID:', birth.id);
+                        }}
+                      >
+                        Request Certificate
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
+
+                {birth.isBirthCertificateIssued && (
+                  <Box sx={{ mt: 3, p: 2, bgcolor: 'success.light', borderRadius: 1 }}>
+                    <Typography variant="subtitle2" color="success.dark" gutterBottom>
+                      Certificate Available
+                    </Typography>
+                    <Typography variant="body2" color="success.dark">
+                      The birth certificate for this record has been issued and is available for printing.
+                    </Typography>
+                    <Box sx={{ mt: 2 }}>
+                      <Button 
+                        variant="contained" 
+                        color="success" 
+                        size="small"
+                        startIcon={<PrintIcon />}
+                        onClick={handlePrintCertificate}
+                      >
+                        Print Certificate
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
               </CardContent>
             </Card>
           </TabPanel>
@@ -725,7 +761,7 @@ const BirthDetail = () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete this birth record? This action cannot be undone and will remove all associated data.
+            Are you sure you want to delete this birth record for Baby {birth.gender} born on {formatDate(birth.birthDate)}? This action cannot be undone and will remove all associated data.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -736,115 +772,214 @@ const BirthDetail = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Print Certificate Dialog */}
+      {/* Birth Certificate Dialog */}
       <Dialog
         open={certificateDialogOpen}
         onClose={handleCertificateDialogClose}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>Birth Certificate</DialogTitle>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">Birth Certificate</Typography>
+            <IconButton onClick={handleCertificateDialogClose}>
+              <ArrowBackIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
         <DialogContent>
-          <Box sx={{ p: 2, border: '1px solid #ccc', borderRadius: 1, mb: 2 }}>
+          <Box sx={{ p: 3, border: '2px solid #ccc', borderRadius: 2, bgcolor: 'background.paper' }}>
             <Box sx={{ textAlign: 'center', mb: 3 }}>
-              <Typography variant="h5" gutterBottom>
-                FEDERAL REPUBLIC OF NIGERIA
+              <Typography variant="h4" gutterBottom>
+                BIRTH CERTIFICATE
               </Typography>
-              <Typography variant="h6" gutterBottom>
-                AKWA IBOM STATE MINISTRY OF HEALTH
+              <Typography variant="h6" color="text.secondary">
+                Akwa Ibom State Government
               </Typography>
-              <Typography variant="h5" gutterBottom sx={{ my: 2 }}>
-                CERTIFICATE OF BIRTH
+              <Typography variant="body2" color="text.secondary">
+                Ministry of Health
               </Typography>
             </Box>
-
+            
+            <Divider sx={{ my: 2 }} />
+            
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <Typography variant="body1" align="center" gutterBottom>
-                  This is to certify that
+                <Typography variant="h6" gutterBottom>
+                  Certificate of Birth
                 </Typography>
               </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Birth Record ID:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {birth.id}
+                </Typography>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Certificate Status:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {birth.isBirthCertificateIssued ? 'ISSUED' : 'PENDING'}
+                </Typography>
+              </Grid>
+              
               <Grid item xs={12}>
-                <Typography variant="h6" align="center" gutterBottom>
-                  {birth.child_name}
+                <Typography variant="body2" color="text.secondary">
+                  Child Information:
+                </Typography>
+                <Typography variant="h6" fontWeight="bold">
+                  Baby {birth.gender ? birth.gender.charAt(0).toUpperCase() + birth.gender.slice(1) : 'Unknown'}
                 </Typography>
               </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Gender:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {birth.gender ? birth.gender.charAt(0).toUpperCase() + birth.gender.slice(1) : 'Not specified'}
+                </Typography>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Date of Birth:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {formatDate(birth.birthDate)}
+                </Typography>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Time of Birth:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {formatTime(birth.birthTime)}
+                </Typography>
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Birth Weight:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {birth.birthWeight ? `${birth.birthWeight} kg` : 'Not recorded'}
+                </Typography>
+              </Grid>
+              
               <Grid item xs={12}>
-                <Typography variant="body1" align="center" gutterBottom>
-                  of gender {birth.gender} was born on
+                <Typography variant="body2" color="text.secondary">
+                  Mother's Full Name:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {birth.motherName || 'Not provided'}
                 </Typography>
               </Grid>
-              <Grid item xs={12}>
-                <Typography variant="h6" align="center" gutterBottom>
-                  {formatDate(birth.date_of_birth)}
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Mother's Age:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {birth.motherAge ? `${birth.motherAge} years` : 'Not provided'}
                 </Typography>
               </Grid>
-              <Grid item xs={12}>
-                <Typography variant="body1" align="center" gutterBottom>
-                  at {birth.place_of_birth}{birth.hospital_name ? ` (${birth.hospital_name})` : ''}
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Mother's LGA of Origin:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {birth.motherLgaOrigin || 'Not provided'}
                 </Typography>
               </Grid>
-              <Grid item xs={12}>
-                <Typography variant="body1" align="center" gutterBottom>
-                  to {birth.mother_name}{birth.father_name ? ` and ${birth.father_name}` : ''}
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Mother's LGA of Residence:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {birth.motherLgaResidence || 'Not provided'}
                 </Typography>
               </Grid>
-              <Grid item xs={12}>
-                <Typography variant="body1" align="center" gutterBottom>
-                  residing at {birth.address}, {birth.city}, {birth.state}
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Birth Type:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {birth.birthType ? birth.birthType.charAt(0).toUpperCase() + birth.birthType.slice(1) : 'Not specified'}
                 </Typography>
               </Grid>
-
-              <Grid item xs={12}>
-                <Divider sx={{ my: 3 }} />
-              </Grid>
-
-              <Grid item xs={6}>
-                <Typography variant="body2" gutterBottom>
-                  Registration Number: {birth.registration_number}
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Delivery Method:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {birth.deliveryMethod ? birth.deliveryMethod.charAt(0).toUpperCase() + birth.deliveryMethod.slice(1) : 'Not specified'}
                 </Typography>
               </Grid>
-              <Grid item xs={6}>
-                <Typography variant="body2" gutterBottom align="right">
-                  Date of Registration: {formatDate(birth.registration_date)}
+              
+              <Grid item xs={12} sm={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Facility ID:
                 </Typography>
-              </Grid>
-              <Grid item xs={12} sx={{ mt: 4 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Box>
-                    <Typography variant="body2" gutterBottom>
-                      ________________________
-                    </Typography>
-                    <Typography variant="body2" gutterBottom>
-                      Registrar's Signature
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" gutterBottom align="right">
-                      [OFFICIAL SEAL]
-                    </Typography>
-                  </Box>
-                </Box>
+                <Typography variant="body1" fontWeight="bold">
+                  {birth.facilityId || 'Not specified'}
+                </Typography>
               </Grid>
             </Grid>
+            
+            <Box sx={{ mt: 4, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                This certificate is issued under the authority of the Akwa Ibom State Government
+              </Typography>
+              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="body2">
+                    ________________________
+                  </Typography>
+                  <Typography variant="caption">
+                    Registrar's Signature
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="body2">
+                    ________________________
+                  </Typography>
+                  <Typography variant="caption">
+                    Official Seal
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
           </Box>
-
-          <DialogContentText>
-            This is a preview of the birth certificate. Click Print to generate a printable version.
-          </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCertificateDialogClose}>Close</Button>
+          <Button onClick={handleCertificateDialogClose}>
+            Close
+          </Button>
           <Button 
             variant="contained" 
             startIcon={<PrintIcon />}
-            onClick={() => {
-              // In a real application, this would trigger printing
-              window.alert('Printing functionality would be implemented here');
-              handleCertificateDialogClose();
-            }}
+            onClick={() => window.print()}
+            disabled={!birth.isBirthCertificateIssued}
           >
-            Print
+            Print Certificate
+          </Button>
+          <Button 
+            variant="outlined" 
+            startIcon={<DownloadIcon />}
+            disabled={!birth.isBirthCertificateIssued}
+          >
+            Download PDF
           </Button>
         </DialogActions>
       </Dialog>

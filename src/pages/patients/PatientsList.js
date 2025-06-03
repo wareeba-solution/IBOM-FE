@@ -50,12 +50,13 @@ const PatientsList = () => {
   const [patients, setPatients] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
-  const [filters, setFilters] = useState({
-    gender: '',
-    dateOfBirth: '',
-    location: '',
-    status: 'active'
-  });
+const [filters, setFilters] = useState({
+  gender: '',
+  lgaResidence: '',      // ✅ Changed from 'location'
+  facilityId: '',        // ✅ Add facility filter
+  ageFrom: '',           // ✅ Add age range
+  ageTo: ''              // ✅ Add age range
+});
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const [totalPatients, setTotalPatients] = useState(0);
@@ -64,42 +65,53 @@ const PatientsList = () => {
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
 
   // Fetch patients data
-  const fetchPatients = async () => {
-    try {
-      const queryParams = {
-        page: page + 1,
-        per_page: pageSize,
-        search: searchTerm,
-        ...filters
-      };
-  
-      console.log('🔍 Fetching patients with params:', queryParams);
-      
-      const response = await getAllPatients(queryParams);
-      console.log('🔍 API Response:', response);
-      console.log('🔍 Response.data:', response.data);
-  
-      // Handle the response structure correctly
-      if (response && response.data) {
-        const { patients = [], totalItems = 0 } = response.data;
-        
-        console.log('🔍 Setting patients:', patients);
-        console.log('🔍 Setting total:', totalItems);
-        
-        setPatients(patients);
-        setTotalPatients(totalItems);
-      } else {
-        console.warn('Unexpected response structure:', response);
-        setPatients([]);
-        setTotalPatients(0);
+ // Replace lines 67-72 with this:
+const fetchPatients = async () => {
+  try {
+    const queryParams = {
+      page: page + 1,
+      limit: pageSize,              // ✅ Changed from 'per_page'
+      // search: searchTerm,        // Remove if API doesn't support general search
+      gender: filters.gender,
+      lgaResidence: filters.location, // ✅ Changed from 'location'
+      facilityId: filters.facilityId, // ✅ Add if you have facility filter
+      ageFrom: filters.ageFrom,      // ✅ Add for age filtering
+      ageTo: filters.ageTo           // ✅ Add for age filtering
+    };
+
+    // Only add non-empty parameters
+    Object.keys(queryParams).forEach(key => {
+      if (queryParams[key] === '' || queryParams[key] === null || queryParams[key] === undefined) {
+        delete queryParams[key];
       }
+    });
+
+    console.log('🔍 Fetching patients with params:', queryParams);
+    
+    const response = await getAllPatients(queryParams);
+    console.log('🔍 API Response:', response);
+
+    if (response && response.data) {
+      const { patients = [], totalItems = 0 } = response.data;
       
-    } catch (error) {
-      console.error('Error fetching patients:', error);
+      console.log('🔍 Setting patients:', patients);
+      console.log('🔍 Setting total:', totalItems);
+      
+      setPatients(patients);
+      setTotalPatients(totalItems);
+    } else {
+      console.warn('Unexpected response structure:', response);
       setPatients([]);
       setTotalPatients(0);
     }
-  };
+    
+  } catch (error) {
+    console.error('Error fetching patients:', error);
+    setPatients([]);
+    setTotalPatients(0);
+  }
+};
+
 
   // Initial data loading
   useEffect(() => {

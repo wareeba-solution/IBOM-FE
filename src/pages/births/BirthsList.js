@@ -17,7 +17,6 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Divider,
   Alert,
   CircularProgress,
   Grid,
@@ -27,13 +26,6 @@ import {
   FormControl,
   InputLabel,
   Select,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
   Tabs,
   Tab
 } from '@mui/material';
@@ -44,100 +36,107 @@ import {
   Clear as ClearIcon,
   Refresh as RefreshIcon,
   FileDownload as ExportIcon,
-  Print as PrintIcon,
-  CloudUpload as UploadIcon,
   Assessment as AssessmentIcon,
-  ChildCare as ChildIcon
+  ChildCare as ChildIcon,
+  CheckCircle as RegisteredIcon,
+  Schedule as PendingIcon,
+  LocalHospital as HospitalIcon,
+  Home as HomeIcon
 } from '@mui/icons-material';
 import { DataGrid } from '@mui/x-data-grid';
 import { format, parseISO } from 'date-fns';
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
+import birthService, { getAllBirths } from '../../services/birthService';
 
-// Mock birth service - replace with actual service when available
-const birthService = {
-  getAllBirths: async (params) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          data: mockBirthData,
-          meta: {
-            total: mockBirthData.length,
-            page: params.page || 1,
-            per_page: params.per_page || 10
-          }
-        });
-      }, 500);
-    });
-  },
-  deleteBirth: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 300);
-    });
-  }
-};
-
-// Mock birth data
-const mockBirthData = Array.from({ length: 50 }, (_, i) => ({
-  id: i + 1,
-  registration_number: `BR${10000 + i}`,
-  child_name: `Baby ${i % 2 === 0 ? 'Boy' : 'Girl'} ${i + 1}`,
-  gender: i % 2 === 0 ? 'Male' : 'Female',
-  date_of_birth: new Date(2023, (i % 12), i % 28 + 1).toISOString().split('T')[0],
-  place_of_birth: i % 3 === 0 ? 'Home' : 'Hospital',
-  birth_weight: (2.5 + Math.random() * 2).toFixed(2) + ' kg',
-  mother_name: `Mother ${i + 1}`,
-  father_name: `Father ${i + 1}`,
-  address: `Address ${i + 1}, Akwa Ibom`,
-  telephone: `080${i}${i}${i}${i}${i}${i}${i}${i}`,
-  status: i % 10 === 0 ? 'pending' : 'registered',
-  created_at: new Date(2023, (i % 12), i % 28 + 1).toISOString()
-}));
-
-// Birth Records List Component
 const BirthsList = () => {
   const navigate = useNavigate();
   const { loading, error, execute } = useApi();
 
   // State
   const [births, setBirths] = useState([]);
+  const [allBirthsData, setAllBirthsData] = useState([]); // Store unfiltered data for counts
+  const [birthCounts, setBirthCounts] = useState({
+    total: 0,
+    registered: 0,
+    pending: 0,
+    hospital: 0,
+    home: 0
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
   const [filters, setFilters] = useState({
+    facilityId: '',
+    startDate: '',
+    endDate: '',
     gender: '',
-    place_of_birth: '',
-    status: '',
-    date_range: ''
+    deliveryMethod: '',
+    birthType: '',
+    lgaResidence: '',
+    status: ''
   });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [totalBirths, setTotalBirths] = useState(0);
   const [selectedBirth, setSelectedBirth] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
+  const [viewMode, setViewMode] = useState('table');
   const [tabValue, setTabValue] = useState(0);
 
   // Fetch birth records
   const fetchBirths = async () => {
-    const queryParams = {
-      page: page + 1,
-      per_page: pageSize,
-      search: searchTerm,
-      ...filters
-    };
+    try {
+      const queryParams = {
+        page: page + 1,
+        limit: pageSize,
+        search: searchTerm,
+        ...filters
+      };
 
-    const result = await execute(
-      birthService.getAllBirths,
-      [queryParams],
-      (response) => {
-        setBirths(response.data);
-        setTotalBirths(response.meta.total);
+      // Remove empty parameters
+      Object.keys(queryParams).forEach(key => {
+        if (queryParams[key] === '' || queryParams[key] === null || queryParams[key] === undefined) {
+          delete queryParams[key];
+        }
+      });
+
+      console.log('🔍 Fetching births with params:', queryParams);
+      
+      const response = await getAllBirths(queryParams);
+      console.log('🔍 API Response:', response);
+
+      if (response && response.data) {
+        const { births = [], total = 0, counts = {} } = response.data;
+        
+        setBirths(births);
+        setTotalBirths(total);
+        
+        // Store all births data for count calculations (only on initial load or when no filters)
+        if (!searchTerm && Object.values(filters).every(v => v === '')) {
+          setAllBirthsData(births);
+          setBirthCounts({
+            total: counts.total || total,
+            registered: counts.registered || births.filter(b => b.status === 'registered').length,
+            pending: counts.pending || births.filter(b => b.status === 'pending').length,
+            hospital: counts.hospital || births.filter(b => b.delivery_method === 'hospital').length,
+            home: counts.home || births.filter(b => b.delivery_method === 'home').length
+          });
+        }
+        
+        console.log('🔍 Setting births:', births.length);
+        console.log('🔍 Birth counts:', birthCounts);
+        
+      } else {
+        console.warn('Unexpected response structure:', response);
+        setBirths([]);
+        setTotalBirths(0);
       }
-    );
+      
+    } catch (error) {
+      console.error('Error fetching births:', error);
+      setBirths([]);
+      setTotalBirths(0);
+    }
   };
 
   // Initial data loading
@@ -175,18 +174,57 @@ const BirthsList = () => {
 
   const handleClearFilters = () => {
     setFilters({
+      facilityId: '',
+      startDate: '',
+      endDate: '',
       gender: '',
-      place_of_birth: '',
-      status: '',
-      date_range: ''
+      deliveryMethod: '',
+      birthType: '',
+      lgaResidence: '',
+      status: ''
     });
     setPage(0);
     setFilterAnchorEl(null);
   };
 
-  // Handle tab change
+  // Handle tab change with specific filtering logic
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
+    setPage(0);
+    
+    // Clear existing filters and apply tab-specific filters
+    let newFilters = {
+      facilityId: '',
+      startDate: '',
+      endDate: '',
+      gender: '',
+      deliveryMethod: '',
+      birthType: '',
+      lgaResidence: '',
+      status: ''
+    };
+
+    switch(newValue) {
+      case 0: // All Records
+        // No additional filters needed
+        break;
+      case 1: // Registered
+        newFilters.status = 'registered';
+        break;
+      case 2: // Pending
+        newFilters.status = 'pending';
+        break;
+      case 3: // Hospital Births
+        newFilters.deliveryMethod = 'hospital';
+   
+      case 4: // Home Births
+        newFilters.deliveryMethod = 'home';
+        break;
+      default:
+        break;
+    }
+    
+    setFilters(newFilters);
   };
 
   // Navigation actions
@@ -251,16 +289,42 @@ const BirthsList = () => {
   // Table columns
   const columns = [
     { field: 'registration_number', headerName: 'Reg. No.', width: 120 },
-    { field: 'child_name', headerName: 'Child Name', width: 180 },
-    { field: 'gender', headerName: 'Gender', width: 110 },
+    { 
+      field: 'child_name', 
+      headerName: 'Child Name', 
+      width: 180,
+      valueGetter: (params) => params.value || `Baby ${params.row.gender === 'male' ? 'Boy' : 'Girl'}`
+    },
+    { 
+      field: 'gender', 
+      headerName: 'Gender', 
+      width: 110,
+      valueFormatter: (params) => params.value ? params.value.charAt(0).toUpperCase() + params.value.slice(1) : '-'
+    },
     { 
       field: 'date_of_birth', 
       headerName: 'Date of Birth', 
       width: 150,
       valueFormatter: (params) => formatDate(params.value)
     },
-    { field: 'birth_weight', headerName: 'Weight', width: 120 },
-    { field: 'place_of_birth', headerName: 'Place of Birth', width: 150 },
+    { 
+      field: 'birth_weight', 
+      headerName: 'Weight (kg)', 
+      width: 120,
+      valueFormatter: (params) => params.value ? `${params.value} kg` : '-'
+    },
+    { 
+      field: 'delivery_method', 
+      headerName: 'Delivery Method', 
+      width: 150,
+      valueFormatter: (params) => params.value ? params.value.charAt(0).toUpperCase() + params.value.slice(1) : '-'
+    },
+    { 
+      field: 'birth_type', 
+      headerName: 'Birth Type', 
+      width: 130,
+      valueFormatter: (params) => params.value ? params.value.charAt(0).toUpperCase() + params.value.slice(1) : '-'
+    },
     { field: 'mother_name', headerName: 'Mother', width: 180 },
     { field: 'father_name', headerName: 'Father', width: 180 },
     { 
@@ -269,7 +333,7 @@ const BirthsList = () => {
       width: 130,
       renderCell: (params) => (
         <Chip 
-          label={params.value} 
+          label={params.value ? params.value.charAt(0).toUpperCase() + params.value.slice(1) : 'Registered'} 
           color={params.value === 'registered' ? 'success' : 'warning'} 
           size="small" 
           variant="outlined" 
@@ -318,10 +382,10 @@ const BirthsList = () => {
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                   <Typography variant="h6" noWrap>
-                    {birth.child_name}
+                    {birth.child_name || `Baby ${birth.gender === 'male' ? 'Boy' : 'Girl'}`}
                   </Typography>
                   <Chip 
-                    label={birth.status} 
+                    label={birth.status ? birth.status.charAt(0).toUpperCase() + birth.status.slice(1) : 'Registered'} 
                     color={birth.status === 'registered' ? 'success' : 'warning'} 
                     size="small" 
                     variant="outlined" 
@@ -335,7 +399,7 @@ const BirthsList = () => {
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="body2" color="text.secondary">
-                      <strong>Gender:</strong> {birth.gender}
+                      <strong>Gender:</strong> {birth.gender ? birth.gender.charAt(0).toUpperCase() + birth.gender.slice(1) : '-'}
                     </Typography>
                   </Grid>
                   <Grid item xs={6}>
@@ -345,7 +409,7 @@ const BirthsList = () => {
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="body2" color="text.secondary">
-                      <strong>Weight:</strong> {birth.birth_weight}
+                      <strong>Weight:</strong> {birth.birth_weight ? `${birth.birth_weight} kg` : '-'}
                     </Typography>
                   </Grid>
                   <Grid item xs={12}>
@@ -359,9 +423,12 @@ const BirthsList = () => {
                     </Typography>
                   </Grid>
                   <Grid item xs={12}>
-                    <Typography variant="body2" color="text.secondary">
-                      <strong>Place:</strong> {birth.place_of_birth}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {birth.delivery_method === 'hospital' ? <HospitalIcon fontSize="small" /> : <HomeIcon fontSize="small" />}
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>Delivery:</strong> {birth.delivery_method ? birth.delivery_method.charAt(0).toUpperCase() + birth.delivery_method.slice(1) : '-'}
+                      </Typography>
+                    </Box>
                   </Grid>
                 </Grid>
               </CardContent>
@@ -398,17 +465,40 @@ const BirthsList = () => {
           </Box>
         </Box>
 
+        {/* Enhanced Tabs with Icons and Counts */}
         <Tabs 
           value={tabValue} 
           onChange={handleTabChange} 
           aria-label="birth records tabs"
           sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
+          variant="scrollable"
+          scrollButtons="auto"
         >
-          <Tab icon={<ChildIcon />} label="All Records" />
-          <Tab label="Registered" />
-          <Tab label="Pending" />
-          <Tab label="Hospital Births" />
-          <Tab label="Home Births" />
+          <Tab 
+            icon={<ChildIcon />} 
+            iconPosition="start"
+            label={`All Records (${birthCounts.total})`}
+          />
+          <Tab 
+            icon={<RegisteredIcon />} 
+            iconPosition="start"
+            label={`Registered (${birthCounts.registered})`}
+          />
+          <Tab 
+            icon={<PendingIcon />} 
+            iconPosition="start"
+            label={`Pending (${birthCounts.pending})`}
+          />
+          <Tab 
+            icon={<HospitalIcon />} 
+            iconPosition="start"
+            label={`Hospital Births (${birthCounts.hospital})`}
+          />
+          <Tab 
+            icon={<HomeIcon />} 
+            iconPosition="start"
+            label={`Home Births (${birthCounts.home})`}
+          />
         </Tabs>
 
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}>
@@ -450,13 +540,14 @@ const BirthsList = () => {
             onClose={handleFilterClose}
             PaperProps={{
               style: {
-                width: 280,
+                width: 320,
+                maxHeight: 500,
               },
             }}
           >
             <Box sx={{ p: 2 }}>
               <Typography variant="subtitle1" gutterBottom>
-                Filter Records
+                Advanced Filters
               </Typography>
               
               <FormControl fullWidth margin="dense" size="small">
@@ -468,59 +559,92 @@ const BirthsList = () => {
                   label="Gender"
                 >
                   <MenuItem value="">All</MenuItem>
-                  <MenuItem value="Male">Male</MenuItem>
-                  <MenuItem value="Female">Female</MenuItem>
+                  <MenuItem value="male">Male</MenuItem>
+                  <MenuItem value="female">Female</MenuItem>
                 </Select>
               </FormControl>
               
               <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Place of Birth</InputLabel>
+                <InputLabel>Birth Type</InputLabel>
                 <Select
-                  name="place_of_birth"
-                  value={filters.place_of_birth}
+                  name="birthType"
+                  value={filters.birthType}
                   onChange={handleFilterChange}
-                  label="Place of Birth"
+                  label="Birth Type"
                 >
                   <MenuItem value="">All</MenuItem>
-                  <MenuItem value="Hospital">Hospital</MenuItem>
-                  <MenuItem value="Home">Home</MenuItem>
-                  <MenuItem value="Other">Other</MenuItem>
+                  <MenuItem value="singleton">Singleton</MenuItem>
+                  <MenuItem value="twin">Twin</MenuItem>
+                  <MenuItem value="triplet">Triplet</MenuItem>
+                  <MenuItem value="multiple">Multiple</MenuItem>
                 </Select>
               </FormControl>
               
               <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Status</InputLabel>
+                <InputLabel>LGA of Residence</InputLabel>
                 <Select
-                  name="status"
-                  value={filters.status}
+                  name="lgaResidence"
+                  value={filters.lgaResidence}
                   onChange={handleFilterChange}
-                  label="Status"
+                  label="LGA of Residence"
                 >
                   <MenuItem value="">All</MenuItem>
-                  <MenuItem value="registered">Registered</MenuItem>
-                  <MenuItem value="pending">Pending</MenuItem>
+                  <MenuItem value="Uyo">Uyo</MenuItem>
+                  <MenuItem value="Ikot Ekpene">Ikot Ekpene</MenuItem>
+                  <MenuItem value="Eket">Eket</MenuItem>
+                  <MenuItem value="Oron">Oron</MenuItem>
+                  <MenuItem value="Abak">Abak</MenuItem>
                 </Select>
               </FormControl>
               
+              <TextField
+                fullWidth
+                margin="dense"
+                size="small"
+                name="startDate"
+                label="Start Date"
+                type="date"
+                value={filters.startDate}
+                onChange={handleFilterChange}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+              />
+              
+              <TextField
+                fullWidth
+                margin="dense"
+                size="small"
+                name="endDate"
+                label="End Date"
+                type="date"
+                value={filters.endDate}
+                onChange={handleFilterChange}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+              />
+              
               <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Date Range</InputLabel>
+                <InputLabel>Facility</InputLabel>
                 <Select
-                  name="date_range"
-                  value={filters.date_range}
+                  name="facilityId"
+                  value={filters.facilityId}
                   onChange={handleFilterChange}
-                  label="Date Range"
+                  label="Facility"
                 >
-                  <MenuItem value="">All Time</MenuItem>
-                  <MenuItem value="last_week">Last Week</MenuItem>
-                  <MenuItem value="last_month">Last Month</MenuItem>
-                  <MenuItem value="last_3_months">Last 3 Months</MenuItem>
-                  <MenuItem value="last_year">Last Year</MenuItem>
+                  <MenuItem value="">All Facilities</MenuItem>
+                  <MenuItem value="facility-1">University of Uyo Teaching Hospital</MenuItem>
+                  <MenuItem value="facility-2">Ibom Specialist Hospital</MenuItem>
+                  <MenuItem value="facility-3">General Hospital Uyo</MenuItem>
+                  <MenuItem value="facility-4">St. Luke's Hospital</MenuItem>
+                  <MenuItem value="facility-5">Primary Health Center</MenuItem>
                 </Select>
               </FormControl>
               
               <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button onClick={handleClearFilters} size="small">
-                  Clear Filters
+                  Clear All
                 </Button>
                 <Button 
                   onClick={handleFilterClose} 
@@ -528,7 +652,7 @@ const BirthsList = () => {
                   size="small" 
                   sx={{ ml: 1 }}
                 >
-                  Apply
+                  Apply Filters
                 </Button>
               </Box>
             </Box>
@@ -537,7 +661,7 @@ const BirthsList = () => {
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
-            onClick={fetchBirths}
+                        onClick={fetchBirths}
           >
             Refresh
           </Button>
@@ -565,6 +689,80 @@ const BirthsList = () => {
           </FormControl>
         </Box>
 
+        {/* Active Filters Display */}
+        {Object.values(filters).some(v => v !== '') && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Active Filters:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {Object.entries(filters).map(([key, value]) => {
+                if (value === '') return null;
+                
+                let displayValue = value;
+                let displayKey = key;
+                
+                // Format display names
+                switch(key) {
+                  case 'deliveryMethod':
+                    displayKey = 'Delivery';
+                    displayValue = value.charAt(0).toUpperCase() + value.slice(1);
+                    break;
+                  case 'birthType':
+                    displayKey = 'Birth Type';
+                    displayValue = value.charAt(0).toUpperCase() + value.slice(1);
+                    break;
+                  case 'lgaResidence':
+                    displayKey = 'LGA';
+                    break;
+                  case 'facilityId':
+                    displayKey = 'Facility';
+                    break;
+                  case 'startDate':
+                    displayKey = 'From';
+                    break;
+                  case 'endDate':
+                    displayKey = 'To';
+                    break;
+                  case 'gender':
+                    displayKey = 'Gender';
+                    displayValue = value.charAt(0).toUpperCase() + value.slice(1);
+                    break;
+                  case 'status':
+                    displayKey = 'Status';
+                    displayValue = value.charAt(0).toUpperCase() + value.slice(1);
+                    break;
+                  default:
+                    displayKey = key.charAt(0).toUpperCase() + key.slice(1);
+                }
+                
+                return (
+                  <Chip
+                    key={key}
+                    label={`${displayKey}: ${displayValue}`}
+                    onDelete={() => {
+                      setFilters({
+                        ...filters,
+                        [key]: ''
+                      });
+                    }}
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                  />
+                );
+              })}
+              <Button
+                size="small"
+                onClick={handleClearFilters}
+                startIcon={<ClearIcon />}
+              >
+                Clear All
+              </Button>
+            </Box>
+          </Box>
+        )}
+
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
@@ -575,6 +773,28 @@ const BirthsList = () => {
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
             <CircularProgress />
           </Box>
+        ) : births.length === 0 ? (
+          <Alert severity="info" sx={{ textAlign: 'center', py: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              No birth records found
+            </Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              {searchTerm || Object.values(filters).some(v => v !== '') 
+                ? 'Try adjusting your search criteria or filters'
+                : 'Start by registering your first birth record'
+              }
+            </Typography>
+            {!searchTerm && !Object.values(filters).some(v => v !== '') && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleAddBirth}
+                sx={{ mt: 2 }}
+              >
+                Register First Birth
+              </Button>
+            )}
+          </Alert>
         ) : viewMode === 'table' ? (
           <Box sx={{ width: '100%' }}>
             <DataGrid
@@ -623,7 +843,7 @@ const BirthsList = () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete birth record for: {selectedBirth?.child_name}? This action cannot be undone.
+            Are you sure you want to delete birth record for: {selectedBirth?.child_name || 'this baby'}? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -638,3 +858,4 @@ const BirthsList = () => {
 };
 
 export default BirthsList;
+
