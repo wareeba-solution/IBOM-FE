@@ -1,5 +1,6 @@
 // src/services/birthService.js
 import axios from 'axios';
+import { getToken } from '../utils/helpers'; // adjust path as needed
 
 // Base API URL
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -17,7 +18,7 @@ const apiClient = axios.create({
 // Add request interceptor for authentication
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = getToken();
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }

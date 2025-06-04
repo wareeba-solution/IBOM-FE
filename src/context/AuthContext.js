@@ -2,7 +2,8 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import jwt_decode from 'jwt-decode';
-import authService, { TOKEN_KEY, USER_KEY } from '../services/authService';
+import authService from '../services/authService';
+import { TOKEN_KEY, USER_KEY } from '../utils/helpers';
 import axios from 'axios';
 import api from '../services/api';
 
@@ -49,7 +50,7 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   useEffect(() => {
-    if (!user) return;      // don’t run until we have a user
+    if (!user) return;      // don't run until we have a user
 
     const fetchRoles = async () => {
       setIsLoading(true);
@@ -83,7 +84,7 @@ export const AuthProvider = ({ children }) => {
   }, [roles]);
   
   useEffect(() => {
-    if (!user) return;      // don’t run until we have a user
+    if (!user) return;      // don't run until we have a user
 
       const fetchFacilities = async () => {
       setIsLoading(true);
@@ -129,9 +130,9 @@ export const AuthProvider = ({ children }) => {
       console.log("Login response:", response.data);
       
       // Extract token and user from response
-      const { token, user } = response.data.data || response.data;
+      const { accessToken, refreshToken, user } = response.data.data || response.data;
       
-      if (!user || !token) {
+      if (!user || !accessToken) {
         console.error("Invalid response format:", response.data);
         throw new Error("Invalid response from server");
       }
@@ -140,11 +141,11 @@ export const AuthProvider = ({ children }) => {
       console.log("User role:", user.role);
       
       // Store token and user in localStorage
-      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(TOKEN_KEY, accessToken);
       localStorage.setItem(USER_KEY, JSON.stringify(user));
       
       // Update state
-      setToken(token);
+      setToken(accessToken);
       setUser(user);
       //setLoading(false);
       
