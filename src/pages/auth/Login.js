@@ -61,22 +61,18 @@ const Login = () => {
       console.log("Login response received:", response.data);
 
       const result = response.data?.data;
-      
-      if (result && result.token) {
-        // Get the role directly from the response
-        const userRole = result.user?.role || null;
-        console.log("Login successful, user role:", userRole);
-      
-        setToken(result.token);
+
+      if (result && result.accessToken && result.user) {
+        // Save tokens and user using your helpers/context
+        setToken(result.accessToken);
         setUser(result.user);
 
         // Redirect based on role
+        const userRole = result.user?.role || null;
         setTimeout(() => {
           if (userRole === 'admin') {
-            console.log("Redirecting to admin page");
             navigate('/admin', { replace: true });
           } else {
-            console.log("Redirecting to dashboard");
             navigate('/dashboard', { replace: true });
           }
         }, 1000);

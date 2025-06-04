@@ -1,70 +1,19 @@
-// // src/services/authService.js
-// import api from './api';
-
-// const authService = {
-//   // Login user
-//   login: async (credentials) => {
-//     const response = await api.post('/auth/login', credentials);
-//     return response.data;
-//   },
-
-//   // Register new user
-//   register: async (userData) => {
-//     const response = await api.post('/auth/register', userData);
-//     return response.data;
-//   },
-
-//   // Get current user data
-//   getCurrentUser: async () => {
-//     const response = await api.get('/auth/me');
-//     return response.data;
-//   },
-
-//   // Request password reset
-//   requestPasswordReset: async (email) => {
-//     const response = await api.post('/auth/forgot-password', { email });
-//     return response.data;
-//   },
-
-//   // Reset password with token
-//   resetPassword: async (resetData) => {
-//     const { token, password, password_confirmation } = resetData;
-//     const response = await api.post('/auth/reset-password', {
-//       token,
-//       password,
-//       password_confirmation
-//     });
-//     return response.data;
-//   },
-
-//   // Update user profile
-//   updateProfile: async (userData) => {
-//     const response = await api.put('/auth/profile', userData);
-//     return response.data;
-//   },
-
-//   // Change password
-//   changePassword: async (passwordData) => {
-//     const response = await api.post('/auth/change-password', passwordData);
-//     return response.data;
-//   },
-
-//   // Verify email with token
-//   verifyEmail: async (token) => {
-//     const response = await api.get(`/auth/verify-email/${token}`);
-//     return response.data;
-//   }
-// };
-
-// export default authService;
-
 import axios from 'axios';
 import api from './api';
+import { 
+  getToken, 
+  setToken, 
+  removeToken, 
+  getRefreshToken, 
+  setRefreshToken, 
+  removeRefreshToken,
+  getUser, 
+  setUser, 
+  removeUser,
+  clearAuthData 
+} from '../utils/helpers';
 
-export const TOKEN_KEY = 'akwa_ibom_health_token';
-export const USER_KEY = 'akwa_ibom_health_user';
-
-// Mock users for development
+// Mock users for development (keeping your existing ones)
 const MOCK_USERS = [
   {
     id: '1',
@@ -72,7 +21,7 @@ const MOCK_USERS = [
     password: 'admin123',
     firstName: 'System',
     lastName: 'Administrator',
-    role: 'admin',  // Make sure this matches the expected value
+    role: 'admin',
     email: 'admin@akwaibomhealth.gov.ng',
     facilityId: '1',
     facilityName: 'Akwa Ibom State Health Department'
@@ -136,7 +85,7 @@ const MOCK_USERS = [
 
 // Initialize axios instance with auth token
 const initializeAxios = () => {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = getToken();
   if (token) {
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   }
@@ -154,20 +103,22 @@ const authService = {
     
     if (mockUser) {
       // Create a copy without the password
-      const { password, ...userWithoutPassword } = mockUser;
+      const { password: _, ...userWithoutPassword } = mockUser;
       const user = userWithoutPassword;
       
-      // Generate a mock token
+      // Generate mock tokens
       const token = `mock-jwt-token-${user.role}-${Date.now()}`;
+      const refreshToken = `mock-refresh-token-${user.role}-${Date.now()}`;
       
-      // Store token and user data
-      localStorage.setItem(TOKEN_KEY, token);
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      // Store tokens and user data using helpers
+      setToken(token);
+      setRefreshToken(refreshToken);
+      setUser(user);
       
       // Set default authorization header
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
-      return { token, user };
+      return { token, refreshToken, user };
     }
     
     // If no mock user matches, throw an error
@@ -183,16 +134,17 @@ const authService = {
     /*
     try {
       const response = await api.post('/auth/login', { username, password });
-      const { token, user } = response.data.data;
+      const { token, refreshToken, user } = response.data.data;
       
-      // Store token and user data
-      localStorage.setItem(TOKEN_KEY, token);
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      // Store tokens and user data using helpers
+      setToken(token);
+      setRefreshToken(refreshToken);
+      setUser(user);
       
       // Set default authorization header
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
-      return { token, user };
+      return { token, refreshToken, user };
     } catch (error) {
       throw error;
     }
@@ -200,9 +152,8 @@ const authService = {
   },
   
   logout: async () => {
-    // Remove token and user data
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    // Clear all auth data using helper
+    clearAuthData();
     
     // Remove authorization header
     delete axios.defaults.headers.common['Authorization'];
@@ -211,45 +162,78 @@ const authService = {
   },
   
   getCurrentUser: async () => {
-    const user = localStorage.getItem(USER_KEY);
-    const token = localStorage.getItem(TOKEN_KEY);
+    const user = getUser();
+    const token = getToken();
     
     if (!user || !token) {
       return null;
     }
     
     // For development/testing purposes - simulate a verified token
-    return JSON.parse(user);
+    return user;
     
     // When backend is ready, use this instead:
     /*
     try {
       // Verify token is still valid by calling a protected endpoint
-      await api.get('/auth/profile');
-      return JSON.parse(user);
+      const response = await api.get('/auth/me');
+      return response.data.data;
     } catch (error) {
       // Token is invalid, clear storage
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
+      clearAuthData();
       return null;
     }
     */
   },
   
+  refreshToken: async () => {
+    const refreshToken = getRefreshToken();
+    
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+    
+    // For development - simulate token refresh
+    const user = getUser();
+    const newToken = `mock-jwt-token-${user?.role}-${Date.now()}`;
+    
+    setToken(newToken);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+    
+    return { token: newToken };
+    
+    // When backend is ready, use this instead:
+    /*
+    try {
+      const response = await api.post('/auth/refresh', { refresh_token: refreshToken });
+      const { token } = response.data.data;
+      
+      setToken(token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      return { token };
+    } catch (error) {
+      // Refresh failed, clear storage
+      clearAuthData();
+      throw error;
+    }
+    */
+  },
+  
   isAuthenticated: () => {
-    return !!localStorage.getItem(TOKEN_KEY);
+    return !!getToken();
   },
   
   // Helper method to check if user has a specific role
   hasRole: (role) => {
-    const user = JSON.parse(localStorage.getItem(USER_KEY) || '{}');
-    return user.role === role;
+    const user = getUser();
+    return user?.role === role;
   },
   
   // Helper method to check if user has one of the roles
   hasAnyRole: (roles) => {
-    const user = JSON.parse(localStorage.getItem(USER_KEY) || '{}');
-    return roles.includes(user.role);
+    const user = getUser();
+    return roles.includes(user?.role);
   }
 };
 
