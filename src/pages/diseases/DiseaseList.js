@@ -48,33 +48,8 @@ import {
 import { format, parseISO } from 'date-fns';
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
-
-// Mock disease service - replace with actual service when available
-const diseaseService = {
-  getAllDiseaseCases: async (params) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          data: mockDiseaseData,
-          meta: {
-            total: mockDiseaseData.length,
-            page: params.page || 1,
-            per_page: params.per_page || 10
-          }
-        });
-      }, 500);
-    });
-  },
-  deleteDiseaseCase: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 300);
-    });
-  }
-};
+import diseaseService from '../../services/diseaseService';
+import patientService from '../../services/patientService'; // If available
 
 // Disease types
 const diseaseTypes = [
@@ -93,33 +68,6 @@ const diseaseTypes = [
   'Other'
 ];
 
-// Mock disease data
-const mockDiseaseData = Array.from({ length: 50 }, (_, i) => {
-  const reportDate = new Date(2023, (i % 12), i % 28 + 1);
-  const onset = new Date(reportDate);
-  onset.setDate(onset.getDate() - (i % 7 + 1));
-  
-  return {
-    id: i + 1,
-    case_id: `CDCS${10000 + i}`,
-    patient_name: `${i % 2 === 0 ? 'John' : 'Jane'} ${['Doe', 'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Miller'][i % 7]} ${i + 1}`,
-    patient_id: `PT${5000 + i}`,
-    age: 15 + (i % 60),
-    gender: i % 2 === 0 ? 'Male' : 'Female',
-    disease_type: diseaseTypes[i % diseaseTypes.length],
-    onset_date: onset.toISOString().split('T')[0],
-    report_date: reportDate.toISOString().split('T')[0],
-    location: `${['Uyo', 'Ikot Ekpene', 'Eket', 'Oron', 'Abak'][i % 5]}, Akwa Ibom`,
-    status: i % 10 === 0 ? 'suspected' : (i % 10 === 1 ? 'probable' : (i % 5 === 0 ? 'confirmed' : 'ruled_out')),
-    severity: i % 10 === 0 ? 'severe' : (i % 5 === 0 ? 'moderate' : 'mild'),
-    outcome: i % 20 === 0 ? 'death' : (i % 10 === 0 ? 'hospitalized' : (i % 5 === 0 ? 'recovered' : 'under_treatment')),
-    is_outbreak: i % 15 === 0,
-    reported_by: `Staff ${i % 20 + 1}`,
-    note: i % 8 === 0 ? 'Patient has travel history to affected region.' : null,
-    created_at: reportDate.toISOString()
-  };
-});
-
 // Disease List Component
 const DiseaseList = () => {
   const navigate = useNavigate();
@@ -130,43 +78,157 @@ const DiseaseList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
   const [filters, setFilters] = useState({
-    disease_type: '',
-    status: '',
+    diseaseId: '',
     severity: '',
+    status: '',
     outcome: '',
-    date_range: ''
+    diagnosisType: '',
+    hospitalized: '',
+    reportedToAuthorities: '',
+    reportDateFrom: '',
+    reportDateTo: ''
   });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [totalCases, setTotalCases] = useState(0);
   const [selectedCase, setSelectedCase] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
+  const [viewMode, setViewMode] = useState('table');
   const [tabValue, setTabValue] = useState(0);
+  const [diseases, setDiseases] = useState([]);
+
+  // Fetch diseases for filter dropdown
+  useEffect(() => {
+    const loadDiseases = async () => {
+      try {
+        const response = await diseaseService.getDiseases();
+        setDiseases(response.data || []);
+      } catch (error) {
+        console.error('Failed to load diseases:', error);
+      }
+    };
+    
+    loadDiseases();
+  }, []);
 
   // Fetch disease cases
   const fetchDiseaseCases = async () => {
-    const queryParams = {
-      page: page + 1,
-      per_page: pageSize,
-      search: searchTerm,
-      ...filters
-    };
+    try {
+      // Map frontend filters to API query params
+      const queryParams = {
+        page: page + 1,
+        limit: pageSize,
+        sortBy: 'reportDate',
+        sortOrder: 'desc'
+      };
 
-    const result = await execute(
-      diseaseService.getAllDiseaseCases,
-      [queryParams],
-      (response) => {
-        setDiseaseCases(response.data);
-        setTotalCases(response.meta.total);
+      // Add search term if provided
+      if (searchTerm) {
+        queryParams.search = searchTerm;
       }
-    );
+
+      // Add filters
+      Object.keys(filters).forEach(key => {
+        if (filters[key] && filters[key] !== '') {
+          queryParams[key] = filters[key];
+        }
+      });
+
+      // Add tab-specific filters
+      switch (tabValue) {
+        case 1: // Confirmed
+          queryParams.status = 'confirmed';
+          break;
+        case 2: // Suspected
+          queryParams.status = 'suspected';
+          break;
+        case 3: // Outbreaks
+          queryParams.isOutbreak = true;
+          break;
+        case 4: // This Month
+          const now = new Date();
+          const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+          queryParams.reportDateFrom = firstDay.toISOString().split('T')[0];
+          break;
+        default:
+          // All cases - no additional filters
+          break;
+      }
+
+      console.log('Fetching disease cases with params:', queryParams);
+
+      await execute(
+        diseaseService.getAllDiseaseCases,
+        [queryParams],
+        async (response) => {
+          console.log('API response:', response);
+          
+          // Handle the response structure
+          const cases = response.data || [];
+          const pagination = response.pagination || { totalItems: cases.length };
+
+          // Map the cases and enhance with patient data
+          const mappedCases = await Promise.all(
+            cases.map(async (caseItem) => {
+              const mappedCase = diseaseService.mapDiseaseCase(caseItem);
+              
+              // Try to get patient information
+              try {
+                if (mappedCase.patient_id && patientService) {
+                  const patientData = await patientService.getPatientById(mappedCase.patient_id);
+                  if (patientData) {
+                    mappedCase.patient_name = patientData.firstName && patientData.lastName ? 
+                      `${patientData.firstName} ${patientData.lastName}${patientData.otherNames ? ' ' + patientData.otherNames : ''}` :
+                      patientData.name || mappedCase.patient_name || 'Unknown Patient';
+                    mappedCase.age = patientData.age || calculateAge(patientData.dateOfBirth);
+                    mappedCase.gender = patientData.gender;
+                    mappedCase.phone_number = patientData.phoneNumber;
+                    mappedCase.email = patientData.email;
+                    mappedCase.address = patientData.address;
+                    mappedCase.occupation = patientData.occupation;
+                    mappedCase.date_of_birth = patientData.dateOfBirth;
+                  }
+                }
+              } catch (patientError) {
+                console.warn('Could not fetch patient data for:', mappedCase.patient_id, patientError);
+                // Use the patient name from the case if available
+                if (!mappedCase.patient_name) {
+                  mappedCase.patient_name = `Patient ${mappedCase.patient_id}`;
+                }
+              }
+
+              return mappedCase;
+            })
+          );
+
+          setDiseaseCases(mappedCases);
+          setTotalCases(pagination.totalItems || mappedCases.length);
+        }
+      );
+    } catch (error) {
+      console.error('Error fetching disease cases:', error);
+      setDiseaseCases([]);
+      setTotalCases(0);
+    }
+  };
+
+  // Helper function to calculate age from date of birth
+  const calculateAge = (dateOfBirth) => {
+    if (!dateOfBirth) return null;
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
   };
 
   // Initial data loading
   useEffect(() => {
     fetchDiseaseCases();
-  }, [page, pageSize, searchTerm, filters]);
+  }, [page, pageSize, searchTerm, filters, tabValue]);
 
   // Handle search
   const handleSearch = (event) => {
@@ -198,11 +260,15 @@ const DiseaseList = () => {
 
   const handleClearFilters = () => {
     setFilters({
-      disease_type: '',
-      status: '',
+      diseaseId: '',
       severity: '',
+      status: '',
       outcome: '',
-      date_range: ''
+      diagnosisType: '',
+      hospitalized: '',
+      reportedToAuthorities: '',
+      reportDateFrom: '',
+      reportDateTo: ''
     });
     setPage(0);
     setFilterAnchorEl(null);
@@ -333,9 +399,162 @@ const DiseaseList = () => {
     return outcome.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  // Table columns
+  // Updated filter menu with API-compatible options
+  const renderFilterMenu = () => (
+    <Menu
+      anchorEl={filterAnchorEl}
+      open={Boolean(filterAnchorEl)}
+      onClose={handleFilterClose}
+      PaperProps={{
+        style: {
+          width: 320,
+          maxHeight: 400
+        },
+      }}
+    >
+      <Box sx={{ p: 2 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Filter Cases
+        </Typography>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Disease</InputLabel>
+          <Select
+            name="diseaseId"
+            value={filters.diseaseId}
+            onChange={handleFilterChange}
+            label="Disease"
+          >
+            <MenuItem value="">All</MenuItem>
+            {diseases.map((disease) => (
+              <MenuItem key={disease.id} value={disease.id}>
+                {disease.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Status</InputLabel>
+          <Select
+            name="status"
+            value={filters.status}
+            onChange={handleFilterChange}
+            label="Status"
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="suspected">Suspected</MenuItem>
+            <MenuItem value="probable">Probable</MenuItem>
+            <MenuItem value="confirmed">Confirmed</MenuItem>
+            <MenuItem value="ruled_out">Ruled Out</MenuItem>
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Severity</InputLabel>
+          <Select
+            name="severity"
+            value={filters.severity}
+            onChange={handleFilterChange}
+            label="Severity"
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="mild">Mild</MenuItem>
+            <MenuItem value="moderate">Moderate</MenuItem>
+            <MenuItem value="severe">Severe</MenuItem>
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Outcome</InputLabel>
+          <Select
+            name="outcome"
+            value={filters.outcome}
+            onChange={handleFilterChange}
+            label="Outcome"
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="under_treatment">Under Treatment</MenuItem>
+            <MenuItem value="recovered">Recovered</MenuItem>
+            <MenuItem value="hospitalized">Hospitalized</MenuItem>
+            <MenuItem value="death">Death</MenuItem>
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Diagnosis Type</InputLabel>
+          <Select
+            name="diagnosisType"
+            value={filters.diagnosisType}
+            onChange={handleFilterChange}
+            label="Diagnosis Type"
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="Clinical">Clinical</MenuItem>
+            <MenuItem value="Laboratory">Laboratory</MenuItem>
+            <MenuItem value="Epidemiological">Epidemiological</MenuItem>
+            <MenuItem value="Presumptive">Presumptive</MenuItem>
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Hospitalized</InputLabel>
+          <Select
+            name="hospitalized"
+            value={filters.hospitalized}
+            onChange={handleFilterChange}
+            label="Hospitalized"
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="true">Yes</MenuItem>
+            <MenuItem value="false">No</MenuItem>
+          </Select>
+        </FormControl>
+        
+        <TextField
+          fullWidth
+          margin="dense"
+          size="small"
+          label="Report Date From"
+          name="reportDateFrom"
+          type="date"
+          value={filters.reportDateFrom}
+          onChange={handleFilterChange}
+          InputLabelProps={{ shrink: true }}
+        />
+        
+        <TextField
+          fullWidth
+          margin="dense"
+          size="small"
+          label="Report Date To"
+          name="reportDateTo"
+          type="date"
+          value={filters.reportDateTo}
+          onChange={handleFilterChange}
+          InputLabelProps={{ shrink: true }}
+        />
+        
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button onClick={handleClearFilters} size="small">
+            Clear Filters
+          </Button>
+          <Button 
+            onClick={handleFilterClose} 
+            variant="contained" 
+            size="small" 
+            sx={{ ml: 1 }}
+          >
+            Apply
+          </Button>
+        </Box>
+      </Box>
+    </Menu>
+  );
+
+  // Updated table columns for API data structure
   const columns = [
-    { field: 'case_id', headerName: 'Case ID', width: 120 },
+    { field: 'case_id', headerName: 'Case ID', width: 140 },
     { field: 'patient_name', headerName: 'Patient Name', width: 180 },
     { field: 'disease_type', headerName: 'Disease', width: 150 },
     { 
@@ -370,7 +589,7 @@ const DiseaseList = () => {
       width: 120,
       renderCell: (params) => (
         <Chip 
-          label={params.value.charAt(0).toUpperCase() + params.value.slice(1)} 
+          label={params.value ? params.value.charAt(0).toUpperCase() + params.value.slice(1) : 'Unknown'} 
           color={getSeverityColor(params.value)} 
           size="small" 
           variant="outlined" 
@@ -582,114 +801,7 @@ const DiseaseList = () => {
             Filter
           </Button>
           
-          <Menu
-            anchorEl={filterAnchorEl}
-            open={Boolean(filterAnchorEl)}
-            onClose={handleFilterClose}
-            PaperProps={{
-              style: {
-                width: 280,
-              },
-            }}
-          >
-            <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Filter Cases
-              </Typography>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Disease Type</InputLabel>
-                <Select
-                  name="disease_type"
-                  value={filters.disease_type}
-                  onChange={handleFilterChange}
-                  label="Disease Type"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  {diseaseTypes.map((type) => (
-                    <MenuItem key={type} value={type}>{type}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Status</InputLabel>
-                <Select
-                  name="status"
-                  value={filters.status}
-                  onChange={handleFilterChange}
-                  label="Status"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="confirmed">Confirmed</MenuItem>
-                  <MenuItem value="suspected">Suspected</MenuItem>
-                  <MenuItem value="probable">Probable</MenuItem>
-                  <MenuItem value="ruled_out">Ruled Out</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Severity</InputLabel>
-                <Select
-                  name="severity"
-                  value={filters.severity}
-                  onChange={handleFilterChange}
-                  label="Severity"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="mild">Mild</MenuItem>
-                  <MenuItem value="moderate">Moderate</MenuItem>
-                  <MenuItem value="severe">Severe</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Outcome</InputLabel>
-                <Select
-                  name="outcome"
-                  value={filters.outcome}
-                  onChange={handleFilterChange}
-                  label="Outcome"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="under_treatment">Under Treatment</MenuItem>
-                  <MenuItem value="recovered">Recovered</MenuItem>
-                  <MenuItem value="hospitalized">Hospitalized</MenuItem>
-                  <MenuItem value="death">Death</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Date Range</InputLabel>
-                <Select
-                  name="date_range"
-                  value={filters.date_range}
-                  onChange={handleFilterChange}
-                  label="Date Range"
-                >
-                  <MenuItem value="">All Time</MenuItem>
-                  <MenuItem value="last_week">Last Week</MenuItem>
-                  <MenuItem value="last_month">Last Month</MenuItem>
-                  <MenuItem value="last_3_months">Last 3 Months</MenuItem>
-                  <MenuItem value="last_year">Last Year</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                <Button onClick={handleClearFilters} size="small">
-                  Clear Filters
-                </Button>
-                <Button 
-                  onClick={handleFilterClose} 
-                  variant="contained" 
-                  size="small" 
-                  sx={{ ml: 1 }}
-                >
-                  Apply
-                </Button>
-              </Box>
-            </Box>
-          </Menu>
+          {renderFilterMenu()}
           
           <Button
             variant="outlined"

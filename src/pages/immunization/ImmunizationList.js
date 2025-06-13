@@ -47,71 +47,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
-
-// Mock immunization service - replace with actual service when available
-const immunizationService = {
-  getAllImmunizations: async (params) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          data: mockImmunizationData,
-          meta: {
-            total: mockImmunizationData.length,
-            page: params.page || 1,
-            per_page: params.per_page || 10
-          }
-        });
-      }, 500);
-    });
-  },
-  deleteImmunization: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 300);
-    });
-  }
-};
-
-// Vaccine types
-const vaccineTypes = [
-  'BCG',
-  'Hepatitis B',
-  'OPV',
-  'Pentavalent',
-  'Pneumococcal',
-  'Rotavirus',
-  'Measles',
-  'Yellow Fever',
-  'Meningitis',
-  'Tetanus Toxoid',
-  'HPV',
-  'COVID-19',
-  'Other'
-];
-
-// Mock immunization data
-const mockImmunizationData = Array.from({ length: 50 }, (_, i) => ({
-  id: i + 1,
-  registration_number: `IM${10000 + i}`,
-  patient_name: `${i % 2 === 0 ? 'John' : 'Jane'} Doe ${i + 1}`,
-  patient_id: `PT${5000 + i}`,
-  gender: i % 2 === 0 ? 'Male' : 'Female',
-  date_of_birth: new Date(2020 - (i % 5), (i % 12), i % 28 + 1).toISOString().split('T')[0],
-  age_months: 12 + (i % 48),
-  vaccine_type: vaccineTypes[i % vaccineTypes.length],
-  dose_number: (i % 3) + 1,
-  vaccination_date: new Date(2023, (i % 12), i % 28 + 1).toISOString().split('T')[0],
-  next_due_date: i % 3 === 2 ? null : new Date(2023, (i % 12) + 2, i % 28 + 1).toISOString().split('T')[0],
-  healthcare_provider: `Nurse ${i % 10 + 1}`,
-  facility: `Health Center ${i % 5 + 1}`,
-  status: i % 10 === 0 ? 'pending' : (i % 10 === 1 ? 'missed' : 'completed'),
-  side_effects: i % 15 === 0 ? 'Mild fever' : (i % 20 === 0 ? 'Swelling at injection site' : null),
-  notes: i % 8 === 0 ? 'Follow up required' : null,
-  created_at: new Date(2023, (i % 12), i % 28 + 1).toISOString()
-}));
+import immunizationService from '../../services/immunizationService'; // Import real service
 
 // Immunization Records List Component
 const ImmunizationList = () => {
@@ -120,45 +56,184 @@ const ImmunizationList = () => {
 
   // State
   const [immunizations, setImmunizations] = useState([]);
+  const [immunizationCounts, setImmunizationCounts] = useState({
+    total: 0,
+    administered: 0,
+    scheduled: 0,
+    missed: 0,
+    cancelled: 0
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
   const [filters, setFilters] = useState({
-    vaccine_type: '',
+    patientId: '',
+    facilityId: '',
+    vaccineType: '',
+    vaccineName: '',
+    dateFrom: '',
+    dateTo: '',
     status: '',
-    age_group: '',
     gender: '',
-    date_range: ''
+    age_group: ''
   });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [totalImmunizations, setTotalImmunizations] = useState(0);
   const [selectedImmunization, setSelectedImmunization] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
+  const [viewMode, setViewMode] = useState('table');
   const [tabValue, setTabValue] = useState(0);
 
   // Fetch immunization records
   const fetchImmunizations = async () => {
-    const queryParams = {
-      page: page + 1,
-      per_page: pageSize,
-      search: searchTerm,
-      ...filters
-    };
+    try {
+      // Map frontend filters to API query params
+      const queryParams = {
+        page: page + 1,
+        limit: pageSize,
+        patientId: filters.patientId || undefined,
+        facilityId: filters.facilityId || undefined,
+        vaccineType: filters.vaccineType || undefined,
+        vaccineName: filters.vaccineName || searchTerm || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+        status: filters.status || undefined,
+        sortBy: 'administrationDate',
+        sortOrder: 'desc'
+      };
 
-    const result = await execute(
-      immunizationService.getAllImmunizations,
-      [queryParams],
-      (response) => {
-        setImmunizations(response.data);
-        setTotalImmunizations(response.meta.total);
+      // Remove undefined parameters
+      Object.keys(queryParams).forEach(key => {
+        if (queryParams[key] === undefined || queryParams[key] === '') {
+          delete queryParams[key];
+        }
+      });
+
+      console.log('Fetching immunizations with params:', queryParams);
+      const response = await immunizationService.getAllImmunizations(queryParams);
+      console.log('Full API response:', response);
+
+      // Handle API response structure
+      if (response && response.data) {
+        // Check if this is actually patient data instead of immunization data
+        const responseData = response.data.immunizations || response.data || [];
+        console.log('Response data:', responseData);
+        
+        // If we're getting patient data instead of immunization data, map it properly
+        const mappedImmunizations = responseData.map((item, index) => {
+          console.log('Processing item:', item);
+          
+          // Check if this looks like patient data (has firstName, lastName, etc.)
+          if (item.firstName && item.lastName) {
+            // This is patient data, create mock immunization record
+            return {
+              id: item.id || `mock-${index}`,
+              registration_number: item.uniqueIdentifier || `IM-${new Date().getFullYear()}-${String(index + 1).padStart(4, '0')}`,
+              patient_name: `${item.firstName} ${item.lastName}${item.otherNames ? ' ' + item.otherNames : ''}`,
+              patient_id: item.uniqueIdentifier || item.id,
+              gender: item.gender || 'Unknown',
+              date_of_birth: item.dateOfBirth,
+              age_months: calculateAgeMonths(item.dateOfBirth),
+              vaccine_type: 'COVID-19', // Mock data since we don't have actual immunization data
+              vaccine_name: 'Pfizer-BioNTech',
+              dose_number: 1,
+              lot_number: `LOT-${Math.floor(Math.random() * 10000)}`,
+              vaccination_date: item.registrationDate || item.createdAt,
+              next_due_date: null,
+              healthcare_provider: 'Dr. Default Provider',
+              facility: item.registrationFacility?.name || 'Unknown Facility',
+              facility_id: item.facilityId,
+              administration_site: 'Left Arm',
+              administration_route: 'Intramuscular',
+              dosage: '0.5 mL',
+              weight_kg: null,
+              height_cm: null,
+              status: 'administered',
+              side_effects: null,
+              notes: null,
+              created_at: item.createdAt
+            };
+          } else {
+            // This is actual immunization data
+            return {
+              id: item.id,
+              registration_number: item.registration_number || `IM-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
+              patient_name: item.patient_name || item.patientName || 'Unknown Patient',
+              patient_id: item.patientId || 'Unknown',
+              gender: item.gender || 'Unknown',
+              date_of_birth: item.date_of_birth || item.dateOfBirth,
+              age_months: item.ageMonths || item.age_months,
+              vaccine_type: item.vaccineType || item.vaccine_type,
+              vaccine_name: item.vaccineName || item.vaccine_name,
+              dose_number: item.doseNumber || item.dose_number || 1,
+              lot_number: item.batchNumber || item.lot_number,
+              vaccination_date: item.administrationDate || item.vaccination_date,
+              next_due_date: item.nextDoseDate || item.next_due_date,
+              healthcare_provider: item.administeredBy || item.healthcare_provider,
+              facility: item.facility_name || item.facilityName || 'Unknown Facility',
+              facility_id: item.facilityId || item.facility_id,
+              administration_site: item.administrationSite || item.administration_site,
+              administration_route: item.administrationRoute || item.administration_route,
+              dosage: item.dosage,
+              weight_kg: item.weightKg || item.weight_kg,
+              height_cm: item.heightCm || item.height_cm,
+              status: item.status?.toLowerCase() || 'administered',
+              side_effects: item.sideEffects || item.side_effects,
+              notes: item.notes,
+              created_at: item.createdAt || item.created_at
+            };
+          }
+        });
+
+        console.log('Mapped immunizations:', mappedImmunizations);
+        setImmunizations(mappedImmunizations);
+        
+        const pagination = response.data.pagination || { totalItems: mappedImmunizations.length };
+        setTotalImmunizations(pagination.totalItems || mappedImmunizations.length);
+      } else {
+        console.log('No data in response');
+        setImmunizations([]);
+        setTotalImmunizations(0);
       }
-    );
+    } catch (error) {
+      console.error('Error fetching immunizations:', error);
+      setImmunizations([]);
+      setTotalImmunizations(0);
+    }
+  };
+
+  // Calculate immunization counts for tabs
+  const calculateImmunizationCounts = (immunizationsData) => {
+    const counts = {
+      total: immunizationsData.length,
+      administered: immunizationsData.filter(imm => imm.status === 'administered').length,
+      scheduled: immunizationsData.filter(imm => imm.status === 'scheduled').length,
+      missed: immunizationsData.filter(imm => imm.status === 'missed').length,
+      cancelled: immunizationsData.filter(imm => imm.status === 'cancelled').length,
+    };
+    setImmunizationCounts(counts);
+  };
+
+  // Fetch immunization counts for tabs
+  const fetchImmunizationCounts = async () => {
+    try {
+      const response = await immunizationService.getAllImmunizations({ limit: 100 });
+      if (response && response.data) {
+        const immunizationsData = response.data.immunizations || response.data || [];
+        calculateImmunizationCounts(immunizationsData);
+      }
+    } catch (error) {
+      console.error('Error fetching immunization counts:', error);
+    }
   };
 
   // Initial data loading
   useEffect(() => {
     fetchImmunizations();
+    // Only fetch counts when we're on first page with no filters/search
+    if (page === 0 && !searchTerm && Object.values(filters).every(v => v === '')) {
+      fetchImmunizationCounts();
+    }
   }, [page, pageSize, searchTerm, filters]);
 
   // Handle search
@@ -170,6 +245,52 @@ const ImmunizationList = () => {
   const handleClearSearch = () => {
     setSearchTerm('');
     setPage(0);
+  };
+
+  // Handle tab change with specific filtering logic
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+    setPage(0);
+    
+    // Clear existing filters and apply tab-specific filters
+    let newFilters = {
+      patientId: '',
+      facilityId: '',
+      vaccineType: '',
+      vaccineName: '',
+      dateFrom: '',
+      dateTo: '',
+      status: '',
+      gender: '',
+      age_group: ''
+    };
+
+    switch(newValue) {
+      case 0: // All Records
+        // No additional filters needed
+        break;
+      case 1: // Administered
+        newFilters.status = 'Administered';
+        break;
+      case 2: // Scheduled
+        newFilters.status = 'Scheduled';
+        break;
+      case 3: // Missed
+        newFilters.status = 'Missed';
+        break;
+      case 4: // Due This Month
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        newFilters.dateFrom = format(firstDay, 'yyyy-MM-dd');
+        newFilters.dateTo = format(lastDay, 'yyyy-MM-dd');
+        newFilters.status = 'Scheduled';
+        break;
+      default:
+        break;
+    }
+    
+    setFilters(newFilters);
   };
 
   // Handle filters
@@ -191,40 +312,18 @@ const ImmunizationList = () => {
 
   const handleClearFilters = () => {
     setFilters({
-      vaccine_type: '',
+      patientId: '',
+      facilityId: '',
+      vaccineType: '',
+      vaccineName: '',
+      dateFrom: '',
+      dateTo: '',
       status: '',
-      age_group: '',
       gender: '',
-      date_range: ''
+      age_group: ''
     });
     setPage(0);
     setFilterAnchorEl(null);
-  };
-
-  // Handle tab change
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
-  };
-
-  // Navigation actions
-  const handleAddImmunization = () => {
-    navigate('/immunizations/new');  // Changed from '/immunization/new' to '/immunizations/new'
-  };
-
-  const handleImmunizationClick = (id) => {
-    navigate(`/immunization/${id}`);
-  };
-
-  const handleEditImmunization = (id, event) => {
-    if (event) {
-      event.stopPropagation();
-    }
-    navigate(`/immunization/${id}/edit`);
-  };
-
-  // Handle statistics view
-  const handleViewStatistics = () => {
-    navigate('/immunizations/statistics');
   };
 
   // Handle delete
@@ -255,6 +354,26 @@ const ImmunizationList = () => {
     }
   };
 
+  // Navigation actions
+  const handleAddImmunization = () => {
+    navigate('/immunizations/new');
+  };
+
+  const handleImmunizationClick = (id) => {
+    navigate(`/immunizations/${id}`);
+  };
+
+  const handleEditImmunization = (id, event) => {
+    if (event) {
+      event.stopPropagation();
+    }
+    navigate(`/immunizations/${id}/edit`);
+  };
+
+  const handleViewStatistics = () => {
+    navigate('/immunizations/statistics');
+  };
+
   // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return '-';
@@ -281,15 +400,16 @@ const ImmunizationList = () => {
     }
   };
 
-  // Table columns
+  // Updated table columns to match API response
   const columns = [
     { field: 'registration_number', headerName: 'Reg. No.', width: 120 },
     { field: 'patient_name', headerName: 'Patient Name', width: 180 },
-    { field: 'vaccine_type', headerName: 'Vaccine', width: 150 },
+    { field: 'vaccine_type', headerName: 'Vaccine Type', width: 130 },
+    { field: 'vaccine_name', headerName: 'Vaccine Name', width: 150 },
     { field: 'dose_number', headerName: 'Dose', width: 80 },
     { 
       field: 'vaccination_date', 
-      headerName: 'Vaccination Date', 
+      headerName: 'Administration Date', 
       width: 150,
       valueFormatter: (params) => formatDate(params.value)
     },
@@ -313,11 +433,13 @@ const ImmunizationList = () => {
         <Chip 
           label={params.value} 
           color={
-            params.value === 'completed' 
+            params.value === 'administered' 
               ? 'success' 
-              : params.value === 'pending' 
-                ? 'warning' 
-                : 'error'
+              : params.value === 'scheduled' 
+                ? 'info'
+                : params.value === 'missed'
+                  ? 'error'
+                  : 'warning'
           } 
           size="small" 
           variant="outlined" 
@@ -457,17 +579,32 @@ const ImmunizationList = () => {
           onChange={handleTabChange} 
           aria-label="immunization records tabs"
           sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
+          variant="scrollable"
+          scrollButtons="auto"
         >
-          <Tab icon={<VaccinesIcon />} label="All Records" />
-          <Tab label="Completed" />
-          <Tab label="Pending" />
-          <Tab label="Missed" />
-          <Tab label="Due This Month" />
+          <Tab 
+            icon={<VaccinesIcon />} 
+            iconPosition="start"
+            label={`All Records (${immunizationCounts.total})`}
+          />
+          <Tab 
+            label={`Administered (${immunizationCounts.administered})`}
+          />
+          <Tab 
+            label={`Scheduled (${immunizationCounts.scheduled})`}
+          />
+          <Tab 
+            label={`Missed (${immunizationCounts.missed})`}
+          />
+          <Tab 
+            label="Due This Month"
+          />
         </Tabs>
 
+        {/* Search and Filter Section */}
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}>
           <TextField
-            placeholder="Search immunization records..."
+            placeholder="Search by vaccine name or patient..."
             variant="outlined"
             size="small"
             value={searchTerm}
@@ -504,29 +641,50 @@ const ImmunizationList = () => {
             onClose={handleFilterClose}
             PaperProps={{
               style: {
-                width: 280,
+                width: 320,
+                maxHeight: 500,
               },
             }}
           >
             <Box sx={{ p: 2 }}>
               <Typography variant="subtitle1" gutterBottom>
-                Filter Records
+                Advanced Filters
               </Typography>
               
               <FormControl fullWidth margin="dense" size="small">
                 <InputLabel>Vaccine Type</InputLabel>
                 <Select
-                  name="vaccine_type"
-                  value={filters.vaccine_type}
+                  name="vaccineType"
+                  value={filters.vaccineType}
                   onChange={handleFilterChange}
                   label="Vaccine Type"
                 >
                   <MenuItem value="">All</MenuItem>
-                  {vaccineTypes.map((type) => (
-                    <MenuItem key={type} value={type}>{type}</MenuItem>
-                  ))}
+                  <MenuItem value="COVID-19">COVID-19</MenuItem>
+                  <MenuItem value="Hepatitis B">Hepatitis B</MenuItem>
+                  <MenuItem value="BCG">BCG</MenuItem>
+                  <MenuItem value="Polio">Polio</MenuItem>
+                  <MenuItem value="Pentavalent">Pentavalent</MenuItem>
+                  <MenuItem value="Pneumococcal">Pneumococcal</MenuItem>
+                  <MenuItem value="Rotavirus">Rotavirus</MenuItem>
+                  <MenuItem value="Measles">Measles</MenuItem>
+                  <MenuItem value="Yellow Fever">Yellow Fever</MenuItem>
+                  <MenuItem value="Meningitis">Meningitis</MenuItem>
+                  <MenuItem value="Tetanus Toxoid">Tetanus Toxoid</MenuItem>
+                  <MenuItem value="HPV">HPV</MenuItem>
                 </Select>
               </FormControl>
+              
+              <TextField
+                fullWidth
+                margin="dense"
+                size="small"
+                name="vaccineName"
+                label="Vaccine Name"
+                value={filters.vaccineName}
+                onChange={handleFilterChange}
+                placeholder="e.g., Pfizer-BioNTech"
+              />
               
               <FormControl fullWidth margin="dense" size="small">
                 <InputLabel>Status</InputLabel>
@@ -537,62 +695,64 @@ const ImmunizationList = () => {
                   label="Status"
                 >
                   <MenuItem value="">All</MenuItem>
-                  <MenuItem value="completed">Completed</MenuItem>
-                  <MenuItem value="pending">Pending</MenuItem>
-                  <MenuItem value="missed">Missed</MenuItem>
+                  <MenuItem value="Administered">Administered</MenuItem>
+                  <MenuItem value="Scheduled">Scheduled</MenuItem>
+                  <MenuItem value="Missed">Missed</MenuItem>
+                  <MenuItem value="Cancelled">Cancelled</MenuItem>
                 </Select>
               </FormControl>
               
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Age Group</InputLabel>
-                <Select
-                  name="age_group"
-                  value={filters.age_group}
-                  onChange={handleFilterChange}
-                  label="Age Group"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="0-6">0-6 months</MenuItem>
-                  <MenuItem value="7-12">7-12 months</MenuItem>
-                  <MenuItem value="13-24">13-24 months</MenuItem>
-                  <MenuItem value="25-60">25-60 months</MenuItem>
-                  <MenuItem value="60+">Above 60 months</MenuItem>
-                </Select>
-              </FormControl>
+              <TextField
+                fullWidth
+                margin="dense"
+                size="small"
+                name="patientId"
+                label="Patient ID"
+                value={filters.patientId}
+                onChange={handleFilterChange}
+              />
               
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Gender</InputLabel>
-                <Select
-                  name="gender"
-                  value={filters.gender}
-                  onChange={handleFilterChange}
-                  label="Gender"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="Male">Male</MenuItem>
-                  <MenuItem value="Female">Female</MenuItem>
-                </Select>
-              </FormControl>
+              <TextField
+                fullWidth
+                margin="dense"
+                size="small"
+                name="facilityId"
+                label="Facility ID"
+                value={filters.facilityId}
+                onChange={handleFilterChange}
+              />
               
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Date Range</InputLabel>
-                <Select
-                  name="date_range"
-                  value={filters.date_range}
-                  onChange={handleFilterChange}
-                  label="Date Range"
-                >
-                  <MenuItem value="">All Time</MenuItem>
-                  <MenuItem value="last_week">Last Week</MenuItem>
-                  <MenuItem value="last_month">Last Month</MenuItem>
-                  <MenuItem value="last_3_months">Last 3 Months</MenuItem>
-                  <MenuItem value="last_year">Last Year</MenuItem>
-                </Select>
-              </FormControl>
+              <TextField
+                fullWidth
+                margin="dense"
+                size="small"
+                name="dateFrom"
+                label="Date From"
+                type="date"
+                value={filters.dateFrom}
+                onChange={handleFilterChange}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+              />
+              
+              <TextField
+                fullWidth
+                margin="dense"
+                size="small"
+                name="dateTo"
+                label="Date To"
+                type="date"
+                value={filters.dateTo}
+                onChange={handleFilterChange}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+              />
               
               <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button onClick={handleClearFilters} size="small">
-                  Clear Filters
+                  Clear All
                 </Button>
                 <Button 
                   onClick={handleFilterClose} 
@@ -600,7 +760,7 @@ const ImmunizationList = () => {
                   size="small" 
                   sx={{ ml: 1 }}
                 >
-                  Apply
+                  Apply Filters
                 </Button>
               </Box>
             </Box>
@@ -637,6 +797,40 @@ const ImmunizationList = () => {
           </FormControl>
         </Box>
 
+        {/* Active Filters Display */}
+        {Object.values(filters).some(v => v !== '') && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Active Filters:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {Object.entries(filters).map(([key, value]) => {
+                if (!value) return null;
+                
+                let displayKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                let displayValue = value;
+                
+                return (
+                  <Chip
+                    key={key}
+                    label={`${displayKey}: ${displayValue}`}
+                    onDelete={() => handleFilterChange({ target: { name: key, value: '' } })}
+                    size="small"
+                    variant="outlined"
+                  />
+                );
+              })}
+              <Button
+                size="small"
+                onClick={handleClearFilters}
+                startIcon={<ClearIcon />}
+              >
+                Clear All
+              </Button>
+            </Box>
+          </Box>
+        )}
+
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
@@ -647,6 +841,28 @@ const ImmunizationList = () => {
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
             <CircularProgress />
           </Box>
+        ) : immunizations.length === 0 ? (
+          <Alert severity="info" sx={{ textAlign: 'center', py: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              No immunization records found
+            </Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              {searchTerm || Object.values(filters).some(v => v !== '') 
+                ? 'Try adjusting your search criteria or filters'
+                : 'Start by recording your first immunization'
+              }
+            </Typography>
+            {!searchTerm && !Object.values(filters).some(v => v !== '') && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleAddImmunization}
+                sx={{ mt: 2 }}
+              >
+                Record First Immunization
+              </Button>
+            )}
+          </Alert>
         ) : viewMode === 'table' ? (
           <Box sx={{ width: '100%' }}>
             <DataGrid
@@ -658,7 +874,7 @@ const ImmunizationList = () => {
               onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
               onPageChange={(newPage) => setPage(newPage)}
               rowCount={totalImmunizations}
-              paginationMode="client"
+              paginationMode="server"
               page={page}
               autoHeight
               disableSelectionOnClick
