@@ -50,13 +50,13 @@ const PatientsList = () => {
   const [patients, setPatients] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
-const [filters, setFilters] = useState({
-  gender: '',
-  lgaResidence: '',      // ✅ Changed from 'location'
-  facilityId: '',        // ✅ Add facility filter
-  ageFrom: '',           // ✅ Add age range
-  ageTo: ''              // ✅ Add age range
-});
+  const [filters, setFilters] = useState({
+    gender: '',
+    lgaResidence: '', // Use lgaResidence instead of location
+    status: '',       // Add status filter if supported
+    ageFrom: '',
+    ageTo: ''
+  });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const [totalPatients, setTotalPatients] = useState(0);
@@ -65,53 +65,50 @@ const [filters, setFilters] = useState({
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
 
   // Fetch patients data
- // Replace lines 67-72 with this:
-const fetchPatients = async () => {
-  try {
-    const queryParams = {
-      page: page + 1,
-      limit: pageSize,              // ✅ Changed from 'per_page'
-      // search: searchTerm,        // Remove if API doesn't support general search
-      gender: filters.gender,
-      lgaResidence: filters.location, // ✅ Changed from 'location'
-      facilityId: filters.facilityId, // ✅ Add if you have facility filter
-      ageFrom: filters.ageFrom,      // ✅ Add for age filtering
-      ageTo: filters.ageTo           // ✅ Add for age filtering
-    };
+  const fetchPatients = async () => {
+    try {
+      const queryParams = {
+        page: page + 1,
+        limit: pageSize,
+        gender: filters.gender,
+        lgaResidence: filters.lgaResidence,
+        status: filters.status,
+        ageFrom: filters.ageFrom,
+        ageTo: filters.ageTo
+      };
 
-    // Only add non-empty parameters
-    Object.keys(queryParams).forEach(key => {
-      if (queryParams[key] === '' || queryParams[key] === null || queryParams[key] === undefined) {
-        delete queryParams[key];
+      // Only add non-empty parameters
+      Object.keys(queryParams).forEach(key => {
+        if (queryParams[key] === '' || queryParams[key] === null || queryParams[key] === undefined) {
+          delete queryParams[key];
+        }
+      });
+
+      console.log('🔍 Fetching patients with params:', queryParams);
+      
+      const response = await getAllPatients(queryParams);
+      console.log('🔍 API Response:', response);
+
+      if (response && response.data) {
+        const { patients = [], totalItems = 0 } = response.data;
+        
+        console.log('🔍 Setting patients:', patients);
+        console.log('🔍 Setting total:', totalItems);
+        
+        setPatients(patients);
+        setTotalPatients(totalItems);
+      } else {
+        console.warn('Unexpected response structure:', response);
+        setPatients([]);
+        setTotalPatients(0);
       }
-    });
-
-    console.log('🔍 Fetching patients with params:', queryParams);
-    
-    const response = await getAllPatients(queryParams);
-    console.log('🔍 API Response:', response);
-
-    if (response && response.data) {
-      const { patients = [], totalItems = 0 } = response.data;
       
-      console.log('🔍 Setting patients:', patients);
-      console.log('🔍 Setting total:', totalItems);
-      
-      setPatients(patients);
-      setTotalPatients(totalItems);
-    } else {
-      console.warn('Unexpected response structure:', response);
+    } catch (error) {
+      console.error('Error fetching patients:', error);
       setPatients([]);
       setTotalPatients(0);
     }
-    
-  } catch (error) {
-    console.error('Error fetching patients:', error);
-    setPatients([]);
-    setTotalPatients(0);
-  }
-};
-
+  };
 
   // Initial data loading
   useEffect(() => {
@@ -149,9 +146,10 @@ const fetchPatients = async () => {
   const handleClearFilters = () => {
     setFilters({
       gender: '',
-      ageGroup: '',
-      location: '',
-      status: 'active'
+      lgaResidence: '', // Use lgaResidence instead of location
+      status: '',       // Add status filter if supported
+      ageFrom: '',
+      ageTo: ''
     });
     setPage(0);
     setFilterAnchorEl(null);
@@ -199,8 +197,13 @@ const fetchPatients = async () => {
 
   // Table columns
   const columns = [
-    { field: 'uniqueIdentifier', headerName: 'Reg. No.', width: 120 },
-    { field: 'firstName', headerName: 'Patient Name', width: 200 },
+    { field: 'id', headerName: 'Reg. No.', width: 120 }, // Use id if uniqueIdentifier is not available
+    { 
+      field: 'fullName', 
+      headerName: 'Patient Name', 
+      width: 200,
+      valueGetter: (params) => `${params.row.firstName} ${params.row.lastName}`
+    },
     { field: 'gender', headerName: 'Gender', width: 100 },
     { 
       field: 'dateOfBirth', 
@@ -547,7 +550,7 @@ const fetchPatients = async () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete patient: {selectedPatient?.full_name}? This action cannot be undone.
+            Are you sure you want to delete patient: {selectedPatient ? `${selectedPatient.firstName} ${selectedPatient.lastName}` : ''}? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

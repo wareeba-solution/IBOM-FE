@@ -108,14 +108,7 @@ export const getAllPatients = async (params) => {
 }
 
 export const getPatientById = async (id) => {
-  try {
-    const response = await apiClient.get(`/api/patients/${id}`);
-    console.log('Patient data response:', response.data);
-    return response.data.data;
-  } catch (error) {
-    // Mock data for development is handled in the interceptor
-    throw error;
-  }
+  return apiClient.get(`/api/patients/${id}`);
 }
 
 export const updatePatient = async (id, patientData) => {
@@ -159,64 +152,58 @@ export const createPatientVisit = async (patientId, visitData) => {
 };
 
 // Mock data functions
-// const getMockPatients = () => {
-//   return Array.from({ length: 50 }, (_, i) => ({
-//     id: i + 1,
-//     registration_number: `PAT${1000 + i}`,
-//     full_name: `Patient ${i + 1}`,
-//     gender: i % 2 === 0 ? 'Male' : 'Female',
-//     date_of_birth: new Date(1980 + i % 40, i % 12, i % 28 + 1).toISOString().split('T')[0],
-//     phone: `080${i}${i}${i}${i}${i}${i}${i}${i}`,
-//     address: `Address ${i + 1}, Akwa Ibom`,
-//     location: i % 3 === 0 ? 'Urban' : 'Rural',
-//     status: i % 10 === 0 ? 'inactive' : 'active',
-//     last_visit: i % 5 === 0 ? null : new Date(2023, i % 12, i % 28 + 1).toISOString().split('T')[0],
-//     created_at: new Date(2022, i % 12, i % 28 + 1).toISOString()
-//   }));
-// };
 const getMockPatients = () => {
   return Array.from({ length: 50 }, (_, i) => ({
     id: i + 1,
-    uniqueIdentifier: `PAT${1000 + i}`, // ✅ Changed from registration_number
-    firstName: `Patient${i + 1}`,        // ✅ Split full_name into firstName
-    lastName: `Last${i + 1}`,            // ✅ and lastName
+    firstName: `John${i + 1}`,
+    lastName: `Doe${i + 1}`,
+    otherNames: i % 3 === 0 ? `Michael${i + 1}` : '',
+    dateOfBirth: `199${i % 10}-05-1${i % 9}`,
     gender: i % 2 === 0 ? 'Male' : 'Female',
-    dateOfBirth: new Date(1980 + i % 40, i % 12, i % 28 + 1).toISOString().split('T')[0], // ✅ Changed from date_of_birth
-    phoneNumber: `080${i}${i}${i}${i}${i}${i}${i}${i}`, // ✅ Changed from phone
-    address: `Address ${i + 1}, Akwa Ibom`,
-    location: i % 3 === 0 ? 'Urban' : 'Rural',
+    maritalStatus: i % 2 === 0 ? 'Married' : 'Single',
+    occupation: 'Teacher',
+    phoneNumber: `+234-801-234-56${70 + i}`,
+    email: `john${i + 1}.doe@email.com`,
+    address: `123 Main Street, District ${i + 1}`,
+    city: 'Abuja',
+    state: 'FCT',
+    lgaResidence: 'Municipal Area Council',
+    bloodGroup: ['O+', 'A+', 'B+', 'AB+'][i % 4],
+    genotype: ['AA', 'AS', 'SS', 'AC'][i % 4],
+    emergencyContactName: `Jane Doe${i + 1}`,
+    emergencyContactRelationship: 'Spouse',
+    emergencyContactPhone: `+234-801-234-56${80 + i}`,
     status: i % 10 === 0 ? 'inactive' : 'active',
-    last_visit: i % 5 === 0 ? null : new Date(2023, i % 12, i % 28 + 1).toISOString().split('T')[0],
-    created_at: new Date(2022, i % 12, i % 28 + 1).toISOString()
+    last_visit: i % 5 === 0 ? null : `2023-0${(i % 9) + 1}-1${i % 9}`,
+    created_at: `2022-0${(i % 9) + 1}-1${i % 9}T10:00:00Z`
   }));
 };
+
 const getMockPatientById = (id) => {
-  // Convert id to number
   const patientId = parseInt(id, 10);
-  
   return {
     id: patientId,
-    registration_number: `PAT${1000 + patientId}`,
-    first_name: `First${patientId}`,
-    last_name: `Last${patientId}`,
-    other_names: patientId % 3 === 0 ? `Middle${patientId}` : '',
+    firstName: `John${patientId}`,
+    lastName: `Doe${patientId}`,
+    otherNames: patientId % 3 === 0 ? `Michael${patientId}` : '',
+    dateOfBirth: `199${patientId % 10}-05-1${patientId % 9}`,
     gender: patientId % 2 === 0 ? 'Male' : 'Female',
-    date_of_birth: new Date(1980 + patientId % 40, patientId % 12, patientId % 28 + 1).toISOString().split('T')[0],
-    phone_number: `080${patientId}${patientId}${patientId}${patientId}${patientId}${patientId}`,
-    email: patientId % 2 === 0 ? `patient${patientId}@example.com` : '',
-    address: `Address ${patientId}, Akwa Ibom`,
-    city: 'Uyo',
-    state: 'Akwa Ibom',
-    postal_code: `23${patientId}${patientId}${patientId}`,
-    blood_group: ['A+', 'B+', 'O+', 'AB+', 'A-', 'B-', 'O-', 'AB-'][patientId % 8],
+    maritalStatus: patientId % 2 === 0 ? 'Married' : 'Single',
+    occupation: 'Teacher',
+    phoneNumber: `+234-801-234-56${70 + patientId}`,
+    email: `john${patientId}.doe@email.com`,
+    address: `123 Main Street, District ${patientId}`,
+    city: 'Abuja',
+    state: 'FCT',
+    lgaResidence: 'Municipal Area Council',
+    bloodGroup: ['O+', 'A+', 'B+', 'AB+'][patientId % 4],
     genotype: ['AA', 'AS', 'SS', 'AC'][patientId % 4],
-    marital_status: ['Single', 'Married', 'Divorced', 'Widowed'][patientId % 4],
-    next_of_kin_name: patientId % 3 === 0 ? '' : `NOK ${patientId}`,
-    next_of_kin_relationship: patientId % 3 === 0 ? '' : ['Spouse', 'Parent', 'Child', 'Sibling'][patientId % 4],
-    next_of_kin_phone: patientId % 3 === 0 ? '' : `070${patientId}${patientId}${patientId}${patientId}${patientId}${patientId}`,
-    notes: patientId % 5 === 0 ? 'Patient has a history of hypertension. Regular checkups recommended.' : '',
+    emergencyContactName: `Jane Doe${patientId}`,
+    emergencyContactRelationship: 'Spouse',
+    emergencyContactPhone: `+234-801-234-56${80 + patientId}`,
     status: patientId % 10 === 0 ? 'inactive' : 'active',
-    registration_date: new Date(2022, patientId % 12, patientId % 28 + 1).toISOString().split('T')[0]
+    last_visit: patientId % 5 === 0 ? null : `2023-0${(patientId % 9) + 1}-1${patientId % 9}`,
+    created_at: `2022-0${(patientId % 9) + 1}-1${patientId % 9}T10:00:00Z`
   };
 };
 

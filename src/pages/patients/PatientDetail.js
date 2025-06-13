@@ -124,32 +124,19 @@ const PatientDetail = () => {
 
   // Fetch patient data
   useEffect(() => {
-    if (!id || hasLoadedOnce) return; // Prevent multiple loads
-    
+    if (!id) return;
     const loadPatient = async () => {
       await execute(
         getPatientById,
         [id],
         (response) => {
-          setPatient(response);
-          setHasLoadedOnce(true); // Mark as loaded
-          console.log("Patient loaded id from bend:", response);
-        },
-        (error) => {
-          if (process.env.NODE_ENV === 'development') {
-            const mockPatient = createMockPatient(id);
-            setPatient(mockPatient);
-            setHasLoadedOnce(true); // Mark as loaded even for mock
-          }
+          // The patient data is in response.data.data
+          setPatient(response?.data?.data || null);
         }
       );
     };
-    
     loadPatient();
   }, [id, execute]);
-
-  
-  console.log("Patient loaded id from bend:", patient);
 
   // Create mock patient for development
   const createMockPatient = (patientId) => {
@@ -778,14 +765,14 @@ const PatientDetail = () => {
               />
               <Divider />
               <CardContent>
-                {patient.next_of_kin_name ? (
+                {patient.emergencyContactName ? (
                   <Grid container spacing={2}>
                     <Grid item xs={12} sm={6}>
                       <Typography variant="subtitle2" color="text.secondary">
-                        Next of Kin
+                        Emergency Contact
                       </Typography>
                       <Typography variant="body1" gutterBottom>
-                        {patient.next_of_kin_name}
+                        {patient.emergencyContactName}
                       </Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
@@ -793,7 +780,7 @@ const PatientDetail = () => {
                         Relationship
                       </Typography>
                       <Typography variant="body1" gutterBottom>
-                        {patient.next_of_kin_relationship || 'Not specified'}
+                        {patient.emergencyContactRelationship || 'Not specified'}
                       </Typography>
                     </Grid>
                     <Grid item xs={12}>
@@ -801,7 +788,7 @@ const PatientDetail = () => {
                         Phone Number
                       </Typography>
                       <Typography variant="body1" gutterBottom>
-                        {patient.next_of_kin_phone || 'Not provided'}
+                        {patient.emergencyContactPhone || 'Not provided'}
                       </Typography>
                     </Grid>
                   </Grid>
@@ -839,7 +826,7 @@ const PatientDetail = () => {
         <TabPanel value={tabValue} index={0}>
           <Card elevation={1}>
             <CardContent>
-              {patient.notes ? (
+              {patient.medicalNotes ? (
                 <Typography variant="body1">
                   {patient.medicalNotes}
                 </Typography>

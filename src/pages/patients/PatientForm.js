@@ -82,19 +82,22 @@ const PatientForm = () => {
     const loadPatient = async () => {
       if (id && id !== 'new') {
         setIsEditMode(true);
-        
+
         await execute(
           getPatientById,
           [id],
           (response) => {
+            // Use response.data.data for the patient object
+            const data = response?.data?.data || {};
             const patientData = {
               ...initialPatientValues,
-              ...response,
-              dateOfBirth: response.dateOfBirth ? new Date(response.dateOfBirth) : null,
+              ...data,
+              dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
             };
-            
+
             setPatient(patientData);
-            
+
+            // Prefill Formik fields
             Object.keys(patientData).forEach(key => {
               formik.setFieldValue(key, patientData[key], false);
             });
@@ -102,9 +105,10 @@ const PatientForm = () => {
         );
       }
     };
-    
+
     loadPatient();
-  }, [id, execute, formik]);
+    // eslint-disable-next-line
+  }, [id, execute]);
 
   // Handle form submission
   async function handleSubmit(values) {

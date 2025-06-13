@@ -46,51 +46,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
-
-// Mock death service - replace with actual service when available
-const deathService = {
-  getDeathById: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockDeath = {
-          id,
-          registration_number: `DR${10000 + parseInt(id)}`,
-          deceased_name: `${parseInt(id) % 2 === 0 ? 'John' : 'Jane'} Doe ${id}`,
-          gender: parseInt(id) % 2 === 0 ? 'Male' : 'Female',
-          date_of_birth: new Date(1940 + parseInt(id) % 50, (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          date_of_death: new Date(2023, (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          age_at_death: 83 - (parseInt(id) % 50),
-          place_of_death: parseInt(id) % 3 === 0 ? 'Hospital' : (parseInt(id) % 3 === 1 ? 'Home' : 'Other'),
-          hospital_name: parseInt(id) % 3 === 0 ? `Hospital ${id}` : '',
-          cause_of_death: parseInt(id) % 5 === 0 ? 'Natural Causes' : (parseInt(id) % 5 === 1 ? 'Heart Disease' : (parseInt(id) % 5 === 2 ? 'Cancer' : (parseInt(id) % 5 === 3 ? 'Accident' : 'Respiratory Disease'))),
-          secondary_causes: parseInt(id) % 4 === 0 ? 'Hypertension' : '',
-          manner_of_death: parseInt(id) % 6 === 0 ? 'Natural' : (parseInt(id) % 6 === 1 ? 'Accident' : (parseInt(id) % 6 === 2 ? 'Suicide' : (parseInt(id) % 6 === 3 ? 'Homicide' : 'Undetermined'))),
-          informant_name: `Informant ${id}`,
-          informant_relationship: parseInt(id) % 4 === 0 ? 'Son' : (parseInt(id) % 4 === 1 ? 'Daughter' : (parseInt(id) % 4 === 2 ? 'Spouse' : 'Sibling')),
-          informant_phone: `080${id}${id}${id}${id}${id}${id}`,
-          informant_address: `Address ${id}, Akwa Ibom`,
-          doctor_name: parseInt(id) % 3 === 0 ? `Dr. Medicine ${id}` : '',
-          doctor_id: parseInt(id) % 3 === 0 ? `MED${id}${id}${id}` : '',
-          city: 'Uyo',
-          state: 'Akwa Ibom',
-          status: parseInt(id) % 10 === 0 ? 'pending' : 'registered',
-          registration_date: new Date().toISOString().split('T')[0],
-          notes: parseInt(id) % 6 === 0 ? 'Special notes about this death record' : ''
-        };
-        resolve(mockDeath);
-      }, 500);
-    });
-  },
-  deleteDeath: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 300);
-    });
-  }
-};
+import deathService from '../../services/deathService'; // Import real service
 
 // Tab panel component
 function TabPanel(props) {
@@ -132,13 +88,15 @@ const DeathDetail = () => {
         deathService.getDeathById,
         [id],
         (response) => {
-          setDeath(response);
+          // Handle the API response structure
+          const deathData = response.data || response;
+          setDeath(deathData);
         }
       );
     };
     
     loadDeath();
-  }, [id]);
+  }, [id, execute]);
 
   // Handle tab change
   const handleTabChange = (event, newValue) => {
@@ -175,7 +133,8 @@ const DeathDetail = () => {
     await execute(
       deathService.deleteDeath,
       [id],
-      () => {
+      (response) => {
+        setDeleteDialogOpen(false);
         navigate('/deaths');
       }
     );

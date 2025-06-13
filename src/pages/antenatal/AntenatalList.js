@@ -47,69 +47,8 @@ import {
 import { format, parseISO, differenceInWeeks } from 'date-fns';
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
-
-// Mock antenatal service - replace with actual service when available
-const antenatalService = {
-  getAllAntenatalRecords: async (params) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          data: mockAntenatalData,
-          meta: {
-            total: mockAntenatalData.length,
-            page: params.page || 1,
-            per_page: params.per_page || 10
-          }
-        });
-      }, 500);
-    });
-  },
-  deleteAntenatalRecord: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 300);
-    });
-  }
-};
-
-// Mock antenatal data
-const mockAntenatalData = Array.from({ length: 50 }, (_, i) => {
-  const lmpDate = new Date(2023 - (i % 2), (i % 12), i % 28 + 1);
-  const registrationDate = new Date(lmpDate);
-  registrationDate.setDate(registrationDate.getDate() + (i % 30) + 10);
-  
-  const currentDate = new Date();
-  const gestationalAge = differenceInWeeks(currentDate, lmpDate);
-  
-  // Calculate EDD (Estimated Due Date): LMP + 280 days
-  const edd = new Date(lmpDate);
-  edd.setDate(edd.getDate() + 280);
-  
-  return {
-    id: i + 1,
-    registration_number: `ANC${10000 + i}`,
-    patient_name: `${i % 2 === 0 ? 'Mary' : 'Sarah'} ${['Johnson', 'Smith', 'Williams', 'Brown', 'Jones', 'Miller', 'Davis'][i % 7]} ${i + 1}`,
-    patient_id: `PT${5000 + i}`,
-    age: 20 + (i % 15),
-    lmp: lmpDate.toISOString().split('T')[0],
-    edd: edd.toISOString().split('T')[0],
-    gestational_age: gestationalAge > 0 ? gestationalAge : 4,
-    gravida: 1 + (i % 4),
-    parity: i % 3,
-    phone_number: `080${i}${i}${i}${i}${i}${i}${i}`,
-    address: `Address ${i + 1}, Akwa Ibom`,
-    risk_level: i % 10 === 0 ? 'high' : (i % 5 === 0 ? 'medium' : 'low'),
-    registration_date: registrationDate.toISOString().split('T')[0],
-    next_appointment: new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() + (i % 14) + 1).toISOString().split('T')[0],
-    visit_count: i % 8,
-    blood_type: ['A+', 'B+', 'O+', 'AB+', 'A-', 'B-', 'O-', 'AB-'][i % 8],
-    status: i % 20 === 0 ? 'delivered' : (i % 15 === 0 ? 'transferred' : (i % 10 === 0 ? 'inactive' : 'active')),
-    created_at: registrationDate.toISOString()
-  };
-});
+import antenatalService from '../../services/antenatalService';
+import patientService from '../../services/patientService'; // If available
 
 // Antenatal Records List Component
 const AntenatalList = () => {
@@ -121,45 +60,144 @@ const AntenatalList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
   const [filters, setFilters] = useState({
-    risk_level: '',
     status: '',
-    trimester: '',
-    age_group: '',
-    date_range: ''
+    outcome: '',
+    hivStatus: '',
+    riskLevel: '',
+    facilityId: '',
+    registrationDateFrom: '',
+    registrationDateTo: '',
+    eddFrom: '',
+    eddTo: ''
   });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [totalRecords, setTotalRecords] = useState(0);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
+  const [viewMode, setViewMode] = useState('table');
   const [tabValue, setTabValue] = useState(0);
 
   // Fetch antenatal records
   const fetchAntenatalRecords = async () => {
-    const queryParams = {
-      page: page + 1,
-      per_page: pageSize,
-      search: searchTerm,
-      ...filters
-    };
+    try {
+      // Map frontend filters to API query params
+      const queryParams = {
+        page: page + 1,
+        limit: pageSize,
+        sortBy: 'registrationDate',
+        sortOrder: 'desc'
+      };
 
-    const result = await execute(
-      antenatalService.getAllAntenatalRecords,
-      [queryParams],
-      (response) => {
-        setAntenatalRecords(response.data);
-        setTotalRecords(response.meta.total);
+      // Add search term if provided
+      if (searchTerm) {
+        // The API might support a general search parameter
+        queryParams.search = searchTerm;
       }
-    );
+
+      // Add filters
+      Object.keys(filters).forEach(key => {
+        if (filters[key] && filters[key] !== '') {
+          queryParams[key] = filters[key];
+        }
+      });
+
+      // Add tab-specific filters
+      switch (tabValue) {
+        case 1: // Active
+          queryParams.status = 'Active';
+          break;
+        case 2: // 1st Trimester
+          queryParams.gestationalAgeMin = 0;
+          queryParams.gestationalAgeMax = 12;
+          break;
+        case 3: // 2nd Trimester
+          queryParams.gestationalAgeMin = 13;
+          queryParams.gestationalAgeMax = 27;
+          break;
+        case 4: // 3rd Trimester
+          queryParams.gestationalAgeMin = 28;
+          queryParams.gestationalAgeMax = 42;
+          break;
+        case 5: // High Risk
+          queryParams.riskLevel = 'high';
+          break;
+        default:
+          // All records - no additional filters
+          break;
+      }
+
+      console.log('Fetching antenatal records with params:', queryParams);
+
+      await execute(
+        antenatalService.getAllAntenatalRecords,
+        [queryParams],
+        async (response) => {
+          console.log('API response:', response);
+          
+          // Handle the response structure
+          const records = response.data || [];
+          const pagination = response.pagination || { totalItems: records.length };
+
+          // Map the records and enhance with patient data
+          const mappedRecords = await Promise.all(
+            records.map(async (record) => {
+              const mappedRecord = antenatalService.mapAntenatalRecord(record);
+              
+              // Try to get patient information
+              try {
+                if (mappedRecord.patient_id && patientService) {
+                  const patientData = await patientService.getPatientById(mappedRecord.patient_id);
+                  if (patientData) {
+                    mappedRecord.patient_name = patientData.firstName && patientData.lastName ? 
+                      `${patientData.firstName} ${patientData.lastName}${patientData.otherNames ? ' ' + patientData.otherNames : ''}` :
+                      patientData.name || 'Unknown Patient';
+                    mappedRecord.age = patientData.age || calculateAge(patientData.dateOfBirth);
+                    mappedRecord.date_of_birth = patientData.dateOfBirth;
+                    mappedRecord.phone_number = patientData.phoneNumber;
+                    mappedRecord.address = patientData.address;
+                  }
+                }
+              } catch (patientError) {
+                console.warn('Could not fetch patient data for:', mappedRecord.patient_id, patientError);
+                // Set default values if patient data unavailable
+                mappedRecord.patient_name = `Patient ${mappedRecord.patient_id}`;
+              }
+
+              return mappedRecord;
+            })
+          );
+
+          setAntenatalRecords(mappedRecords);
+          setTotalRecords(pagination.totalItems || mappedRecords.length);
+        }
+      );
+    } catch (error) {
+      console.error('Error fetching antenatal records:', error);
+      setAntenatalRecords([]);
+      setTotalRecords(0);
+    }
+  };
+
+  // Helper function to calculate age from date of birth
+  const calculateAge = (dateOfBirth) => {
+    if (!dateOfBirth) return null;
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
   };
 
   // Initial data loading
   useEffect(() => {
     fetchAntenatalRecords();
-  }, [page, pageSize, searchTerm, filters]);
+  }, [page, pageSize, searchTerm, filters, tabValue]);
 
-  // Handle search
+  // Handle search with debouncing
   const handleSearch = (event) => {
     setSearchTerm(event.target.value);
     setPage(0);
@@ -170,7 +208,7 @@ const AntenatalList = () => {
     setPage(0);
   };
 
-  // Handle filters
+  // Handle filters - Updated with API-compatible filter options
   const handleFilterClick = (event) => {
     setFilterAnchorEl(event.currentTarget);
   };
@@ -189,11 +227,15 @@ const AntenatalList = () => {
 
   const handleClearFilters = () => {
     setFilters({
-      risk_level: '',
       status: '',
-      trimester: '',
-      age_group: '',
-      date_range: ''
+      outcome: '',
+      hivStatus: '',
+      riskLevel: '',
+      facilityId: '',
+      registrationDateFrom: '',
+      registrationDateTo: '',
+      eddFrom: '',
+      eddTo: ''
     });
     setPage(0);
     setFilterAnchorEl(null);
@@ -202,6 +244,7 @@ const AntenatalList = () => {
   // Handle tab change
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
+    setPage(0); // Reset to first page when changing tabs
   };
 
   // Navigation actions
@@ -218,11 +261,6 @@ const AntenatalList = () => {
       event.stopPropagation();
     }
     navigate(`/antenatal/${id}/edit`);
-  };
-
-  // Handle statistics view
-  const handleViewStatistics = () => {
-    navigate('/antenatal/statistics');
   };
 
   // Handle delete
@@ -270,17 +308,17 @@ const AntenatalList = () => {
     return '3rd';
   };
 
-  // Get status color
+  // Get status color - Updated for API status values
   const getStatusColor = (status) => {
     switch (status) {
-      case 'active':
+      case 'Active':
         return 'success';
-      case 'inactive':
-        return 'warning';
-      case 'delivered':
+      case 'Completed':
         return 'info';
-      case 'transferred':
+      case 'Transferred':
         return 'secondary';
+      case 'Lost to Follow-up':
+        return 'warning';
       default:
         return 'default';
     }
@@ -288,7 +326,7 @@ const AntenatalList = () => {
 
   // Get risk level color
   const getRiskLevelColor = (riskLevel) => {
-    switch (riskLevel) {
+    switch (riskLevel?.toLowerCase()) {
       case 'high':
         return 'error';
       case 'medium':
@@ -300,15 +338,15 @@ const AntenatalList = () => {
     }
   };
 
-  // Table columns
+  // Updated table columns for API data structure
   const columns = [
-    { field: 'registration_number', headerName: 'Reg. No.', width: 120 },
+    { field: 'registration_number', headerName: 'Reg. No.', width: 140 },
     { field: 'patient_name', headerName: 'Patient Name', width: 180 },
     { 
       field: 'gestational_age', 
       headerName: 'Gest. Age (Weeks)', 
       width: 150,
-      valueFormatter: (params) => `${params.value} (${getTrimester(params.value)})`
+      valueFormatter: (params) => params.value ? `${params.value} (${getTrimester(params.value)})` : 'N/A'
     },
     { 
       field: 'edd', 
@@ -322,14 +360,19 @@ const AntenatalList = () => {
       width: 120,
       valueFormatter: (params) => formatDate(params.value)
     },
-    { field: 'visit_count', headerName: 'Visits', width: 80 },
+    { 
+      field: 'gravida', 
+      headerName: 'G/P', 
+      width: 80,
+      valueFormatter: (params) => `G${params.row.gravida}P${params.row.para || params.row.parity || 0}`
+    },
     { 
       field: 'risk_level', 
       headerName: 'Risk Level', 
       width: 130,
       renderCell: (params) => (
         <Chip 
-          label={params.value} 
+          label={params.value || 'Unknown'} 
           color={getRiskLevelColor(params.value)} 
           size="small" 
           variant="outlined" 
@@ -342,7 +385,7 @@ const AntenatalList = () => {
       width: 130,
       renderCell: (params) => (
         <Chip 
-          label={params.value} 
+          label={params.value || 'Unknown'} 
           color={getStatusColor(params.value)} 
           size="small" 
           variant="outlined" 
@@ -374,7 +417,132 @@ const AntenatalList = () => {
     },
   ];
 
-  // Card view render function
+  // Updated filter menu with API-compatible options
+  const renderFilterMenu = () => (
+    <Menu
+      anchorEl={filterAnchorEl}
+      open={Boolean(filterAnchorEl)}
+      onClose={handleFilterClose}
+      PaperProps={{
+        style: {
+          width: 320,
+          maxHeight: 400
+        },
+      }}
+    >
+      <Box sx={{ p: 2 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Filter Records
+        </Typography>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Status</InputLabel>
+          <Select
+            name="status"
+            value={filters.status}
+            onChange={handleFilterChange}
+            label="Status"
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="Active">Active</MenuItem>
+            <MenuItem value="Completed">Completed</MenuItem>
+            <MenuItem value="Transferred">Transferred</MenuItem>
+            <MenuItem value="Lost to Follow-up">Lost to Follow-up</MenuItem>
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Outcome</InputLabel>
+          <Select
+            name="outcome"
+            value={filters.outcome}
+            onChange={handleFilterChange}
+            label="Outcome"
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="Ongoing">Ongoing</MenuItem>
+            <MenuItem value="Live Birth">Live Birth</MenuItem>
+            <MenuItem value="Stillbirth">Stillbirth</MenuItem>
+            <MenuItem value="Miscarriage">Miscarriage</MenuItem>
+            <MenuItem value="Abortion">Abortion</MenuItem>
+            <MenuItem value="Ectopic Pregnancy">Ectopic Pregnancy</MenuItem>
+            <MenuItem value="Unknown">Unknown</MenuItem>
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>HIV Status</InputLabel>
+          <Select
+            name="hivStatus"
+            value={filters.hivStatus}
+            onChange={handleFilterChange}
+            label="HIV Status"
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="Positive">Positive</MenuItem>
+            <MenuItem value="Negative">Negative</MenuItem>
+            <MenuItem value="Unknown">Unknown</MenuItem>
+            <MenuItem value="Not Tested">Not Tested</MenuItem>
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Risk Level</InputLabel>
+          <Select
+            name="riskLevel"
+            value={filters.riskLevel}
+            onChange={handleFilterChange}
+            label="Risk Level"
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="low">Low Risk</MenuItem>
+            <MenuItem value="medium">Medium Risk</MenuItem>
+            <MenuItem value="high">High Risk</MenuItem>
+          </Select>
+        </FormControl>
+        
+        <TextField
+          fullWidth
+          margin="dense"
+          size="small"
+          label="Registration Date From"
+          name="registrationDateFrom"
+          type="date"
+          value={filters.registrationDateFrom}
+          onChange={handleFilterChange}
+          InputLabelProps={{ shrink: true }}
+        />
+        
+        <TextField
+          fullWidth
+          margin="dense"
+          size="small"
+          label="Registration Date To"
+          name="registrationDateTo"
+          type="date"
+          value={filters.registrationDateTo}
+          onChange={handleFilterChange}
+          InputLabelProps={{ shrink: true }}
+        />
+        
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button onClick={handleClearFilters} size="small">
+            Clear Filters
+          </Button>
+          <Button 
+            onClick={handleFilterClose} 
+            variant="contained" 
+            size="small" 
+            sx={{ ml: 1 }}
+          >
+            Apply
+          </Button>
+        </Box>
+      </Box>
+    </Menu>
+  );
+
+  // Updated card view for API data
   const renderAntenatalCards = () => {
     return (
       <Grid container spacing={2}>
@@ -391,10 +559,10 @@ const AntenatalList = () => {
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                   <Typography variant="h6" noWrap>
-                    {record.patient_name}
+                    {record.patient_name || 'Loading...'}
                   </Typography>
                   <Chip 
-                    label={record.status} 
+                    label={record.status || 'Unknown'} 
                     color={getStatusColor(record.status)} 
                     size="small" 
                     variant="outlined" 
@@ -403,17 +571,17 @@ const AntenatalList = () => {
                 <Grid container spacing={1}>
                   <Grid item xs={6}>
                     <Typography variant="body2" color="text.secondary">
-                      <strong>Reg No:</strong> {record.registration_number}
+                      <strong>Reg No:</strong> {record.registration_number || 'N/A'}
                     </Typography>
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="body2" color="text.secondary">
-                      <strong>Age:</strong> {record.age} years
+                      <strong>Age:</strong> {record.age ? `${record.age} years` : 'N/A'}
                     </Typography>
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="body2" color="text.secondary">
-                      <strong>Gestational Age:</strong> {record.gestational_age} weeks ({getTrimester(record.gestational_age)})
+                      <strong>Gestational Age:</strong> {record.gestational_age ? `${record.gestational_age} weeks` : 'N/A'}
                     </Typography>
                   </Grid>
                   <Grid item xs={6}>
@@ -428,18 +596,18 @@ const AntenatalList = () => {
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="body2" color="text.secondary">
-                      <strong>Visits:</strong> {record.visit_count}
+                      <strong>G/P:</strong> G{record.gravida || 0}P{record.para || record.parity || 0}
                     </Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
                       <Chip 
-                        label={`G${record.gravida}P${record.parity}`} 
+                        label={record.outcome || 'Ongoing'} 
                         size="small" 
                         variant="outlined" 
                       />
                       <Chip 
-                        label={`Risk: ${record.risk_level}`} 
+                        label={`Risk: ${record.risk_level || 'Unknown'}`} 
                         color={getRiskLevelColor(record.risk_level)} 
                         size="small" 
                         variant="outlined" 
@@ -466,7 +634,7 @@ const AntenatalList = () => {
             <Button
               variant="outlined"
               startIcon={<AssessmentIcon />}
-              onClick={handleViewStatistics}
+              onClick={() => navigate('/antenatal/statistics')}
               sx={{ mr: 1 }}
             >
               Statistics
@@ -528,114 +696,7 @@ const AntenatalList = () => {
             Filter
           </Button>
           
-          <Menu
-            anchorEl={filterAnchorEl}
-            open={Boolean(filterAnchorEl)}
-            onClose={handleFilterClose}
-            PaperProps={{
-              style: {
-                width: 280,
-              },
-            }}
-          >
-            <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Filter Records
-              </Typography>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Risk Level</InputLabel>
-                <Select
-                  name="risk_level"
-                  value={filters.risk_level}
-                  onChange={handleFilterChange}
-                  label="Risk Level"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="low">Low Risk</MenuItem>
-                  <MenuItem value="medium">Medium Risk</MenuItem>
-                  <MenuItem value="high">High Risk</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Status</InputLabel>
-                <Select
-                  name="status"
-                  value={filters.status}
-                  onChange={handleFilterChange}
-                  label="Status"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="inactive">Inactive</MenuItem>
-                  <MenuItem value="delivered">Delivered</MenuItem>
-                  <MenuItem value="transferred">Transferred</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Trimester</InputLabel>
-                <Select
-                  name="trimester"
-                  value={filters.trimester}
-                  onChange={handleFilterChange}
-                  label="Trimester"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="1st">1st Trimester</MenuItem>
-                  <MenuItem value="2nd">2nd Trimester</MenuItem>
-                  <MenuItem value="3rd">3rd Trimester</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Age Group</InputLabel>
-                <Select
-                  name="age_group"
-                  value={filters.age_group}
-                  onChange={handleFilterChange}
-                  label="Age Group"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="below-18">Below 18</MenuItem>
-                  <MenuItem value="18-25">18-25 years</MenuItem>
-                  <MenuItem value="26-35">26-35 years</MenuItem>
-                  <MenuItem value="above-35">Above 35 years</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Date Range</InputLabel>
-                <Select
-                  name="date_range"
-                  value={filters.date_range}
-                  onChange={handleFilterChange}
-                  label="Date Range"
-                >
-                  <MenuItem value="">All Time</MenuItem>
-                  <MenuItem value="last_week">Last Week</MenuItem>
-                  <MenuItem value="last_month">Last Month</MenuItem>
-                  <MenuItem value="last_3_months">Last 3 Months</MenuItem>
-                  <MenuItem value="last_year">Last Year</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                <Button onClick={handleClearFilters} size="small">
-                  Clear Filters
-                </Button>
-                <Button 
-                  onClick={handleFilterClose} 
-                  variant="contained" 
-                  size="small" 
-                  sx={{ ml: 1 }}
-                >
-                  Apply
-                </Button>
-              </Box>
-            </Box>
-          </Menu>
+          {renderFilterMenu()}
           
           <Button
             variant="outlined"
@@ -689,7 +750,7 @@ const AntenatalList = () => {
               onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
               onPageChange={(newPage) => setPage(newPage)}
               rowCount={totalRecords}
-              paginationMode="client"
+              paginationMode="server"
               page={page}
               autoHeight
               disableSelectionOnClick
