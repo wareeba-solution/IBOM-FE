@@ -43,67 +43,11 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { format, differenceInYears } from 'date-fns';
+import deathService from '../../services/deathService'; // Import real service
 
-// Mock death service - replace with actual service when available
-const deathService = {
-  getDeathById: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockDeath = {
-          id,
-          registration_number: `DR${10000 + parseInt(id)}`,
-          deceased_name: `${parseInt(id) % 2 === 0 ? 'John' : 'Jane'} Doe ${id}`,
-          gender: parseInt(id) % 2 === 0 ? 'Male' : 'Female',
-          date_of_birth: new Date(1940 + parseInt(id) % 50, (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          date_of_death: new Date(2023, (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          age_at_death: 83 - (parseInt(id) % 50),
-          place_of_death: parseInt(id) % 3 === 0 ? 'Hospital' : (parseInt(id) % 3 === 1 ? 'Home' : 'Other'),
-          hospital_name: parseInt(id) % 3 === 0 ? `Hospital ${id}` : '',
-          cause_of_death: parseInt(id) % 5 === 0 ? 'Natural Causes' : (parseInt(id) % 5 === 1 ? 'Heart Disease' : (parseInt(id) % 5 === 2 ? 'Cancer' : (parseInt(id) % 5 === 3 ? 'Accident' : 'Respiratory Disease'))),
-          secondary_causes: parseInt(id) % 4 === 0 ? 'Hypertension' : '',
-          manner_of_death: parseInt(id) % 6 === 0 ? 'Natural' : (parseInt(id) % 6 === 1 ? 'Accident' : (parseInt(id) % 6 === 2 ? 'Suicide' : (parseInt(id) % 6 === 3 ? 'Homicide' : 'Undetermined'))),
-          informant_name: `Informant ${id}`,
-          informant_relationship: parseInt(id) % 4 === 0 ? 'Son' : (parseInt(id) % 4 === 1 ? 'Daughter' : (parseInt(id) % 4 === 2 ? 'Spouse' : 'Sibling')),
-          informant_phone: `080${id}${id}${id}${id}${id}${id}`,
-          informant_address: `Address ${id}, Akwa Ibom`,
-          doctor_name: parseInt(id) % 3 === 0 ? `Dr. Medicine ${id}` : '',
-          doctor_id: parseInt(id) % 3 === 0 ? `MED${id}${id}${id}` : '',
-          city: 'Uyo',
-          state: 'Akwa Ibom',
-          status: parseInt(id) % 10 === 0 ? 'pending' : 'registered',
-          registration_date: new Date().toISOString().split('T')[0],
-          notes: parseInt(id) % 6 === 0 ? 'Special notes about this death record' : ''
-        };
-        resolve(mockDeath);
-      }, 500);
-    });
-  },
-  createDeath: async (data) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ 
-          success: true, 
-          id: Math.floor(Math.random() * 1000),
-          ...data
-        });
-      }, 500);
-    });
-  },
-  updateDeath: async (id, data) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ 
-          success: true, 
-          id,
-          ...data
-        });
-      }, 500);
-    });
-  }
-};
+// UUID validation helper
+const isValidUUID = (str) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
 // Form validation schema
 const deathValidationSchema = Yup.object({
@@ -196,25 +140,45 @@ const DeathForm = () => {
   // Handle form submission
   const handleSubmit = async (values) => {
     try {
-      // Format date values
-      const formattedValues = {
-        ...values,
-        date_of_birth: values.date_of_birth ? format(new Date(values.date_of_birth), 'yyyy-MM-dd') : null,
+      // Map form values to API payload according to Swagger docs
+      const payload = {
+        deceased_name: values.deceased_name,
+        gender: values.gender,
+        date_of_birth: values.date_of_birth ? format(new Date(values.date_of_birth), 'yyyy-MM-dd') : undefined,
         date_of_death: format(new Date(values.date_of_death), 'yyyy-MM-dd'),
-        registration_date: format(new Date(values.registration_date), 'yyyy-MM-dd')
+        age_at_death: values.age_at_death ? Number(values.age_at_death) : undefined,
+        place_of_death: values.place_of_death,
+        hospital_name: values.hospital_name || undefined,
+        cause_of_death: values.cause_of_death,
+        manner_of_death: values.manner_of_death,
+        informant_name: values.informant_name,
+        informant_relationship: values.informant_relationship,
+        informant_phone: values.informant_phone || undefined,
+        city: values.city,
+        state: values.state,
+        registration_date: format(new Date(values.registration_date), 'yyyy-MM-dd'),
+        status: values.status,
+        // Additional fields that might be needed
+        secondary_causes: values.secondary_causes || undefined,
+        doctor_name: values.doctor_name || undefined,
+        doctor_id: values.doctor_id || undefined,
+        informant_address: values.informant_address || undefined,
+        notes: values.notes || undefined,
       };
+
+      // Remove undefined fields
+      Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
 
       if (isEditMode) {
         // Update existing death record
         await execute(
           deathService.updateDeath,
-          [id, formattedValues],
+          [id, payload],
           (response) => {
             setAlertMessage('Death record updated successfully');
             setAlertSeverity('success');
             setAlertOpen(true);
-            
-            // Navigate back to death detail after a short delay
+
             setTimeout(() => {
               navigate(`/deaths/${id}`);
             }, 1500);
@@ -224,21 +188,20 @@ const DeathForm = () => {
         // Create new death record
         await execute(
           deathService.createDeath,
-          [formattedValues],
+          [payload],
           (response) => {
             setAlertMessage('Death record registered successfully');
             setAlertSeverity('success');
             setAlertOpen(true);
-            
-            // Navigate to the new death's detail page
+
             setTimeout(() => {
-              navigate(`/deaths/${response.id}`);
+              navigate(`/deaths/${response.id || response.data?.id}`);
             }, 1500);
           }
         );
       }
     } catch (err) {
-      setAlertMessage('Failed to save death record information');
+      setAlertMessage(`Failed to ${isEditMode ? 'update' : 'save'} death record information`);
       setAlertSeverity('error');
       setAlertOpen(true);
     }
@@ -266,35 +229,55 @@ const DeathForm = () => {
   // Load death data if in edit mode
   useEffect(() => {
     const loadDeath = async () => {
-      if (id && id !== 'new') {
+      if (id && id !== 'new' && isValidUUID(id)) {
         setIsEditMode(true);
         
         await execute(
           deathService.getDeathById,
           [id],
           (response) => {
-            // Transform API response to form values format
-            const deathData = {
-              ...initialDeathValues,
-              ...response,
-              date_of_birth: response.date_of_birth ? new Date(response.date_of_birth) : null,
-              date_of_death: response.date_of_death ? new Date(response.date_of_death) : new Date(),
-              registration_date: response.registration_date ? new Date(response.registration_date) : new Date()
+            const deathData = response.data || response;
+            
+            // Map API response fields to form field names
+            const mappedData = {
+              deceased_name: deathData.deceased_name || '',
+              gender: deathData.gender || '',
+              date_of_birth: deathData.date_of_birth ? new Date(deathData.date_of_birth) : null,
+              date_of_death: deathData.date_of_death ? new Date(deathData.date_of_death) : new Date(),
+              age_at_death: deathData.age_at_death || '',
+              place_of_death: deathData.place_of_death || '',
+              hospital_name: deathData.hospital_name || '',
+              cause_of_death: deathData.cause_of_death || '',
+              secondary_causes: deathData.secondary_causes || '',
+              manner_of_death: deathData.manner_of_death || '',
+              informant_name: deathData.informant_name || '',
+              informant_relationship: deathData.informant_relationship || '',
+              informant_phone: deathData.informant_phone || '',
+              informant_address: deathData.informant_address || '',
+              doctor_name: deathData.doctor_name || '',
+              doctor_id: deathData.doctor_id || '',
+              city: deathData.city || '',
+              state: deathData.state || 'Akwa Ibom',
+              registration_date: deathData.registration_date ? new Date(deathData.registration_date) : new Date(),
+              status: deathData.status || 'registered',
+              notes: deathData.notes || '',
             };
             
             setDeath(deathData);
             
-            // Set formik values
-            Object.keys(deathData).forEach(key => {
-              formik.setFieldValue(key, deathData[key], false);
-            });
+            // Set formik values to prefill the form
+            formik.setValues(mappedData);
           }
         );
+      } else if (id && id !== 'new' && !isValidUUID(id)) {
+        // Handle case where ID is not a valid UUID
+        console.error('Invalid death ID format');
+        navigate('/deaths');
       }
     };
     
     loadDeath();
-  }, [id]);
+  }, [id, execute, navigate]);
 
   // Handle form cancellation
   const handleCancel = () => {

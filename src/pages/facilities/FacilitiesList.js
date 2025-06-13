@@ -53,100 +53,7 @@ import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
 import useAuth from '../../hooks/useAuth';
 import api from '../../services/api';
-
-// Mock facility service - replace with actual service when available
-const facilityService = {
-  /*getAllFacilities: async (params) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          data: mockFacilityData,
-          meta: {
-            total: mockFacilityData.length,
-            page: params.page || 1,
-            per_page: params.per_page || 10
-          }
-        });
-      }, 500);
-    });
-  },*/
-   getAllFacilities: async (params) => {
-    try {
-      const response = await api.get('/facilities', { params });
-      console.log('API Response facility:', response.data.data.facilities);
-      return {
-        data: response.data.data.facilities || [],
-        meta: response.meta || {
-          total: response.data?.length || 0,
-          page: params.page || 1,
-          per_page: params.per_page || 10
-        }
-      };
-    } catch (error) {
-      console.error('Error fetching facilities:', error);
-      // Return empty data but maintain structure to prevent UI errors
-      return {
-        data: [],
-        meta: {
-          total: 0,
-          page: params.page || 1,
-          per_page: params.per_page || 10
-        }
-      };
-    }
-  },
-  
-  getFacilityById: async (id) => {
-    try {
-      const response = await api.get(`/facilities/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching facility ${id}:`, error);
-      throw error;
-    }
-  },
-  deleteFacility: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 300);
-    });
-  }
-};
-
-// Mock facility data
-const mockFacilityData = Array.from({ length: 30 }, (_, i) => ({
-  id: i + 1,
-  facility_code: `FAC${10000 + i}`,
-  name: `${i % 3 === 0 ? 'General Hospital' : (i % 3 === 1 ? 'Primary Health Center' : 'Medical Clinic')} ${i + 1}`,
-  type: i % 3 === 0 ? 'Hospital' : (i % 3 === 1 ? 'Primary Health Center' : 'Clinic'),
-  level: i % 3 === 0 ? 'Secondary' : (i % 3 === 1 ? 'Primary' : 'Primary'),
-  ownership: i % 4 === 0 ? 'Government' : (i % 4 === 1 ? 'Private' : (i % 4 === 2 ? 'Faith-based' : 'NGO')),
-  address: `Address ${i + 1}, Akwa Ibom`,
-  city: i % 5 === 0 ? 'Uyo' : (i % 5 === 1 ? 'Ikot Ekpene' : (i % 5 === 2 ? 'Eket' : (i % 5 === 3 ? 'Oron' : 'Abak'))),
-  local_govt: i % 5 === 0 ? 'Uyo' : (i % 5 === 1 ? 'Ikot Ekpene' : (i % 5 === 2 ? 'Eket' : (i % 5 === 3 ? 'Oron' : 'Abak'))),
-  state: 'Akwa Ibom',
-  postal_code: `5${i}${i}${i}${i}`,
-  phone: `080${i}${i}${i}${i}${i}${i}${i}${i}`,
-  email: `facility${i}@example.com`,
-  website: i % 3 === 0 ? `www.facility${i}.com` : '',
-  gps_coordinates: `${4 + Math.random() * 2}, ${7 + Math.random() * 2}`,
-  services: [
-    'Outpatient Services',
-    i % 2 === 0 ? 'Surgery' : 'Laboratory Services',
-    i % 3 === 0 ? 'Emergency Services' : 'Pharmacy',
-    i % 4 === 0 ? 'Maternity' : 'Pediatrics'
-  ],
-  beds: i % 3 === 0 ? 50 + i : (i % 3 === 1 ? 20 + i : 10 + i),
-  staff_count: i % 3 === 0 ? 100 + i : (i % 3 === 1 ? 30 + i : 15 + i),
-  head_name: `Dr. ${i % 2 === 0 ? 'John' : 'Jane'} Smith ${i}`,
-  head_title: i % 3 === 0 ? 'Medical Director' : (i % 3 === 1 ? 'Chief Medical Officer' : 'Head Doctor'),
-  registration_date: new Date(2010 + (i % 12), (i % 12), i % 28 + 1).toISOString().split('T')[0],
-  status: i % 10 === 0 ? 'Inactive' : 'Active',
-  last_updated: new Date(2023, (i % 12), i % 28 + 1).toISOString()
-}));
+import facilityService from '../../services/facilityService';
 
 // Facilities List Component
 const FacilitiesList = () => {
@@ -158,45 +65,119 @@ const FacilitiesList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
   const [filters, setFilters] = useState({
-    type: '',
-    level: '',
-    ownership: '',
-    city: '',
-    status: ''
+    facilityType: '',
+    status: '',
+    lga: ''
   });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [totalFacilities, setTotalFacilities] = useState(0);
   const [selectedFacility, setSelectedFacility] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
+  const [viewMode, setViewMode] = useState('table');
   const [tabValue, setTabValue] = useState(0);
-  //const {facilities} = useAuth()
 
-  // Fetch facilities data
+  // Add state for tab loading
+  const [tabLoading, setTabLoading] = useState(false);
+
+  // Facility types from API
+  const facilityTypes = [
+    { value: 'hospital', label: 'Hospital' },
+    { value: 'clinic', label: 'Clinic' },
+    { value: 'health_center', label: 'Health Center' },
+    { value: 'maternity', label: 'Maternity' }
+  ];
+
+  // LGAs in Akwa Ibom State
+  const lgas = [
+    'Abak', 'Eastern Obolo', 'Eket', 'Esit Eket', 'Essien Udim', 'Etim Ekpo',
+    'Etinan', 'Ibeno', 'Ibesikpo Asutan', 'Ibiono-Ibom', 'Ika', 'Ikono',
+    'Ikot Abasi', 'Ikot Ekpene', 'Ini', 'Itu', 'Mbo', 'Mkpat-Enin',
+    'Nsit-Atai', 'Nsit-Ibom', 'Nsit-Ubium', 'Obot Akara', 'Okobo',
+    'Onna', 'Oron', 'Oruk Anam', 'Udung-Uko', 'Ukanafun', 'Uruan',
+    'Urue-Offong/Oruko', 'Uyo'
+  ];
+
+  // Fetch facilities data - Updated for real API
   const fetchFacilities = async () => {
-    const queryParams = {
-      page: page + 1,
-      per_page: pageSize,
-      search: searchTerm,
-      ...filters
-    };
+    try {
+      // Map frontend filters to API query params
+      const queryParams = {
+        page: page + 1,
+        limit: pageSize
+      };
 
-    const result = await execute(
-      facilityService.getAllFacilities,
-      [queryParams],
-      (response) => {
-        setFacilities(response.data);
-        console.log('Facilities:', facilities);
-        setTotalFacilities(response.meta.total);
+      // Add search term if provided
+      if (searchTerm) {
+        queryParams.search = searchTerm;
       }
-    );
+
+      // Add filters
+      Object.keys(filters).forEach(key => {
+        if (filters[key] && filters[key] !== '') {
+          queryParams[key] = filters[key];
+        }
+      });
+
+      // Add tab-specific filters - FIXED VERSION
+      switch (tabValue) {
+        case 1: // Hospitals
+          queryParams.facilityType = 'hospital';
+          break;
+        case 2: // Health Centers  
+          queryParams.facilityType = 'health_center';
+          break;
+        case 3: // Clinics
+          queryParams.facilityType = 'clinic';
+          break;
+        case 4: // Maternity Centers
+          queryParams.facilityType = 'maternity';
+          break;
+        default:
+          // All Facilities (tab 0) - no additional filters
+          break;
+      }
+
+      console.log('Tab value:', tabValue, 'Applied filter:', queryParams.facilityType);
+      console.log('Fetching facilities with params:', queryParams);
+
+      await execute(
+        facilityService.getAllFacilities,
+        [queryParams],
+        (response) => {
+          console.log('Full API response in component:', response);
+          
+          const facilitiesData = response.data || [];
+          const metaData = response.meta || { totalItems: facilitiesData.length };
+
+          console.log('Facilities data to set:', facilitiesData);
+          console.log('Meta data:', metaData);
+
+          // Ensure we have valid facility data
+          if (Array.isArray(facilitiesData)) {
+            setFacilities(facilitiesData);
+            setTotalFacilities(metaData.totalItems || facilitiesData.length);
+            console.log('State updated with facilities:', facilitiesData.length, 'items');
+          } else {
+            console.error('Invalid facilities data format:', facilitiesData);
+            setFacilities([]);
+            setTotalFacilities(0);
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error fetching facilities:', error);
+      setFacilities([]);
+      setTotalFacilities(0);
+    }
   };
 
-  // Initial data loading
+  // Initial data loading - Make sure tabValue is in the dependency array
   useEffect(() => {
+    console.log('useEffect triggered - fetching facilities');
+    console.log('Dependencies:', { page, pageSize, searchTerm, filters, tabValue });
     fetchFacilities();
-  }, [page, pageSize, searchTerm, filters]);
+  }, [page, pageSize, searchTerm, filters, tabValue]); // tabValue should trigger re-fetch
 
   // Handle search
   const handleSearch = (event) => {
@@ -228,19 +209,23 @@ const FacilitiesList = () => {
 
   const handleClearFilters = () => {
     setFilters({
-      type: '',
-      level: '',
-      ownership: '',
-      city: '',
-      status: ''
+      facilityType: '',
+      status: '',
+      lga: ''
     });
     setPage(0);
     setFilterAnchorEl(null);
   };
 
-  // Handle tab change
+  // Handle tab change - Add debugging
   const handleTabChange = (event, newValue) => {
+    console.log('Tab changed from', tabValue, 'to', newValue);
+    setTabLoading(true);
     setTabValue(newValue);
+    setPage(0);
+    
+    // Clear tab loading after a short delay
+    setTimeout(() => setTabLoading(false), 100);
   };
 
   // Navigation actions
@@ -292,24 +277,117 @@ const FacilitiesList = () => {
     }
   };
 
-  // Table columns
+  // Updated filter menu with API-compatible options
+  const renderFilterMenu = () => (
+    <Menu
+      anchorEl={filterAnchorEl}
+      open={Boolean(filterAnchorEl)}
+      onClose={handleFilterClose}
+      PaperProps={{
+        style: {
+          width: 280,
+        },
+      }}
+    >
+      <Box sx={{ p: 2 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Filter Facilities
+        </Typography>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Facility Type</InputLabel>
+          <Select
+            name="facilityType"
+            value={filters.facilityType}
+            onChange={handleFilterChange}
+            label="Facility Type"
+          >
+            <MenuItem value="">All</MenuItem>
+            {facilityTypes.map((type) => (
+              <MenuItem key={type.value} value={type.value}>
+                {type.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Status</InputLabel>
+          <Select
+            name="status"
+            value={filters.status}
+            onChange={handleFilterChange}
+            label="Status"
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="active">Active</MenuItem>
+            <MenuItem value="inactive">Inactive</MenuItem>
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Local Government Area</InputLabel>
+          <Select
+            name="lga"
+            value={filters.lga}
+            onChange={handleFilterChange}
+            label="Local Government Area"
+          >
+            <MenuItem value="">All</MenuItem>
+            {lgas.map((lga) => (
+              <MenuItem key={lga} value={lga}>
+                {lga}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button onClick={handleClearFilters} size="small">
+            Clear Filters
+          </Button>
+          <Button 
+            onClick={handleFilterClose} 
+            variant="contained" 
+            size="small" 
+            sx={{ ml: 1 }}
+          >
+            Apply
+          </Button>
+        </Box>
+      </Box>
+    </Menu>
+  );
+
+  // Updated table columns for API data structure
   const columns = [
     { field: 'facility_code', headerName: 'Facility Code', width: 120 },
-    { field: 'name', headerName: 'Facility Name', width: 220 },
-    { field: 'type', headerName: 'Type', width: 150 },
-    { field: 'level', headerName: 'Level', width: 120 },
-    { field: 'city', headerName: 'City', width: 120 },
-    { field: 'ownership', headerName: 'Ownership', width: 150 },
-    { field: 'beds', headerName: 'Beds', width: 100, type: 'number' },
-    { field: 'staff_count', headerName: 'Staff', width: 100, type: 'number' },
+    { field: 'name', headerName: 'Facility Name', width: 250 },
+    { 
+      field: 'facilityType', 
+      headerName: 'Type', 
+      width: 150,
+      valueFormatter: (params) => {
+        const typeMap = {
+          'hospital': 'Hospital',
+          'clinic': 'Clinic',
+          'health_center': 'Health Center',
+          'maternity': 'Maternity'
+        };
+        return typeMap[params.value] || params.value;
+      }
+    },
+    { field: 'lga', headerName: 'LGA', width: 150 },
+    { field: 'contactPerson', headerName: 'Contact Person', width: 180 },
+    { field: 'phoneNumber', headerName: 'Phone', width: 150 },
     { 
       field: 'status', 
       headerName: 'Status', 
       width: 120,
       renderCell: (params) => (
         <Chip 
-          label={params.value} 
-          color={params.value === 'Active' ? 'success' : 'default'} 
+          label={params.value?.charAt(0).toUpperCase() + params.value?.slice(1) || 'Unknown'} 
+          color={params.value === 'active' ? 'success' : 'default'} 
           size="small" 
           variant="outlined" 
         />
@@ -340,7 +418,7 @@ const FacilitiesList = () => {
     },
   ];
 
-  // Card view render function
+  // Updated card view for API data
   const renderFacilityCards = () => {
     return (
       <Grid container spacing={2}>
@@ -358,8 +436,8 @@ const FacilitiesList = () => {
                   component="div"
                   sx={{ 
                     height: 140, 
-                    bgcolor: facility.type === 'Hospital' ? 'primary.main' : 
-                              (facility.type === 'Primary Health Center' ? 'secondary.main' : 'info.main'),
+                    bgcolor: facility.facilityType === 'hospital' ? 'primary.main' : 
+                              (facility.facilityType === 'health_center' ? 'secondary.main' : 'info.main'),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
@@ -373,8 +451,8 @@ const FacilitiesList = () => {
                       {facility.name}
                     </Typography>
                     <Chip 
-                      label={facility.status} 
-                      color={facility.status === 'Active' ? 'success' : 'default'} 
+                      label={facility.status?.charAt(0).toUpperCase() + facility.status?.slice(1) || 'Unknown'} 
+                      color={facility.status === 'active' ? 'success' : 'default'} 
                       size="small" 
                       variant="outlined" 
                     />
@@ -382,7 +460,7 @@ const FacilitiesList = () => {
                   <Typography variant="body2" color="text.secondary" gutterBottom>
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                       <HospitalIcon fontSize="small" sx={{ mr: 1 }} />
-                      {facility.facilityType} ({facility.level})
+                      {facility.facilityType?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                       <LocationIcon fontSize="small" sx={{ mr: 1 }} />
@@ -390,28 +468,19 @@ const FacilitiesList = () => {
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                       <PhoneIcon fontSize="small" sx={{ mr: 1 }} />
-                      {facility.phone}
+                      {facility.phoneNumber}
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                       <PersonIcon fontSize="small" sx={{ mr: 1 }} />
-                      {facility.head_name} ({facility.head_title})
+                      {facility.contactPerson}
                     </Box>
                   </Typography>
                   
                   <Divider sx={{ my: 1 }} />
                   
-                  <Grid container spacing={1}>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Beds:</strong> {facility.beds}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Staff:</strong> {facility.staff_count}
-                      </Typography>
-                    </Grid>
-                  </Grid>
+                  <Typography variant="body2" color="text.secondary">
+                    <strong>Address:</strong> {facility.address}
+                  </Typography>
                 </CardContent>
               </CardActionArea>
             </Card>
@@ -420,6 +489,13 @@ const FacilitiesList = () => {
       </Grid>
     );
   };
+
+  // Add debugging for facilities state
+  useEffect(() => {
+    console.log('Facilities state updated:', facilities.length, 'items');
+    console.log('Current tab value:', tabValue);
+    console.log('Current filters:', filters);
+  }, [facilities, tabValue, filters]);
 
   return (
     <MainLayout title="Facility Management">
@@ -453,12 +529,11 @@ const FacilitiesList = () => {
           aria-label="facility types tabs"
           sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
         >
-          <Tab icon={<HospitalIcon />} label="All Facilities" />
-          <Tab label="Hospitals" />
-          <Tab label="Health Centers" />
-          <Tab label="Clinics" />
-          <Tab label="Government Owned" />
-          <Tab label="Private Owned" />
+          <Tab icon={<HospitalIcon />} label="All Facilities" />      {/* Index 0 */}
+          <Tab label="Hospitals" />                                    {/* Index 1 - hospital */}
+          <Tab label="Health Centers" />                               {/* Index 2 - health_center */}
+          <Tab label="Clinics" />                                      {/* Index 3 - clinic */}
+          <Tab label="Maternity Centers" />                            {/* Index 4 - maternity */}
         </Tabs>
 
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}>
@@ -494,113 +569,7 @@ const FacilitiesList = () => {
             Filter
           </Button>
           
-          <Menu
-            anchorEl={filterAnchorEl}
-            open={Boolean(filterAnchorEl)}
-            onClose={handleFilterClose}
-            PaperProps={{
-              style: {
-                width: 280,
-              },
-            }}
-          >
-            <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Filter Facilities
-              </Typography>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Facility Type</InputLabel>
-                <Select
-                  name="type"
-                  value={filters.type}
-                  onChange={handleFilterChange}
-                  label="Facility Type"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="Hospital">Hospital</MenuItem>
-                  <MenuItem value="Primary Health Center">Primary Health Center</MenuItem>
-                  <MenuItem value="Clinic">Clinic</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Facility Level</InputLabel>
-                <Select
-                  name="level"
-                  value={filters.level}
-                  onChange={handleFilterChange}
-                  label="Facility Level"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="Primary">Primary</MenuItem>
-                  <MenuItem value="Secondary">Secondary</MenuItem>
-                  <MenuItem value="Tertiary">Tertiary</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Ownership</InputLabel>
-                <Select
-                  name="ownership"
-                  value={filters.ownership}
-                  onChange={handleFilterChange}
-                  label="Ownership"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="Government">Government</MenuItem>
-                  <MenuItem value="Private">Private</MenuItem>
-                  <MenuItem value="Faith-based">Faith-based</MenuItem>
-                  <MenuItem value="NGO">NGO</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>City</InputLabel>
-                <Select
-                  name="city"
-                  value={filters.city}
-                  onChange={handleFilterChange}
-                  label="City"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="Uyo">Uyo</MenuItem>
-                  <MenuItem value="Ikot Ekpene">Ikot Ekpene</MenuItem>
-                  <MenuItem value="Eket">Eket</MenuItem>
-                  <MenuItem value="Oron">Oron</MenuItem>
-                  <MenuItem value="Abak">Abak</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Status</InputLabel>
-                <Select
-                  name="status"
-                  value={filters.status}
-                  onChange={handleFilterChange}
-                  label="Status"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="Active">Active</MenuItem>
-                  <MenuItem value="Inactive">Inactive</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                <Button onClick={handleClearFilters} size="small">
-                  Clear Filters
-                </Button>
-                <Button 
-                  onClick={handleFilterClose} 
-                  variant="contained" 
-                  size="small" 
-                  sx={{ ml: 1 }}
-                >
-                  Apply
-                </Button>
-              </Box>
-            </Box>
-          </Menu>
+          {renderFilterMenu()}
           
           <Button
             variant="outlined"
@@ -639,7 +608,7 @@ const FacilitiesList = () => {
           </Alert>
         )}
 
-        {loading ? (
+        {(loading || tabLoading) ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
             <CircularProgress />
           </Box>

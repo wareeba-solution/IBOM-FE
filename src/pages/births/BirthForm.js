@@ -46,73 +46,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { format } from 'date-fns';
-
-// Mock birth service - replace with actual service when available
-const birthService = {
-  getBirthById: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockBirth = {
-          id,
-          registration_number: `BR${10000 + parseInt(id)}`,
-          child_name: `Baby ${parseInt(id) % 2 === 0 ? 'Boy' : 'Girl'} ${id}`,
-          gender: parseInt(id) % 2 === 0 ? 'Male' : 'Female',
-          date_of_birth: new Date(2023, (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          place_of_birth: parseInt(id) % 3 === 0 ? 'Home' : 'Hospital',
-          birth_weight: (2.5 + Math.random() * 2).toFixed(2),
-          birth_length: (45 + Math.random() * 10).toFixed(1),
-          head_circumference: (30 + Math.random() * 5).toFixed(1),
-          hospital_name: parseInt(id) % 3 === 0 ? '' : `Hospital ${id}`,
-          mother_name: `Mother ${id}`,
-          mother_age: 20 + (parseInt(id) % 20),
-          mother_occupation: 'Teacher',
-          mother_id_number: `M${100000 + parseInt(id)}`,
-          mother_phone: `080${id}${id}${id}${id}${id}${id}${id}`,
-          father_name: `Father ${id}`,
-          father_age: 25 + (parseInt(id) % 20),
-          father_occupation: 'Engineer',
-          father_id_number: `F${100000 + parseInt(id)}`,
-          father_phone: `070${id}${id}${id}${id}${id}${id}${id}`,
-          address: `Address ${id}, Akwa Ibom`,
-          city: 'Uyo',
-          state: 'Akwa Ibom',
-          complications: parseInt(id) % 5 === 0 ? 'None' : '',
-          birth_attendant: parseInt(id) % 3 === 0 ? 'Midwife' : 'Doctor',
-          delivery_type: parseInt(id) % 4 === 0 ? 'Caesarean Section' : 'Normal',
-          status: parseInt(id) % 10 === 0 ? 'pending' : 'registered',
-          registration_date: new Date().toISOString().split('T')[0],
-          notes: parseInt(id) % 7 === 0 ? 'Special notes about this birth' : ''
-        };
-        resolve(mockBirth);
-      }, 500);
-    });
-  },
-  createBirth: async (data) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ 
-          success: true, 
-          id: Math.floor(Math.random() * 1000),
-          ...data
-        });
-      }, 500);
-    });
-  },
-  updateBirth: async (id, data) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ 
-          success: true, 
-          id,
-          ...data
-        });
-      }, 500);
-    });
-  }
-};
+import birthService from '../../services/birthService';
 
 // Form validation schema
 const birthValidationSchema = Yup.object({
@@ -226,27 +160,53 @@ const BirthForm = () => {
   // Steps for the form
   const steps = ['Child Information', 'Parents Information', 'Birth Details', 'Registration'];
 
+  // Check if a string is a valid UUID
+  const isValidUUID = (str) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
   // Handle form submission
   const handleSubmit = async (values) => {
     try {
-      // Format date values
-      const formattedValues = {
-        ...values,
-        date_of_birth: format(new Date(values.date_of_birth), 'yyyy-MM-dd'),
-        registration_date: format(new Date(values.registration_date), 'yyyy-MM-dd')
+      // Map form values to API payload according to Swagger docs
+      const payload = {
+        // Only include motherId if it's a valid UUID
+        ...(isValidUUID(values.mother_id_number) ? { motherId: values.mother_id_number } : {}),
+        motherName: values.mother_name,
+        motherAge: values.mother_age ? Number(values.mother_age) : undefined,
+        motherLgaOrigin: values.mother_lga_origin || undefined,
+        motherLgaResidence: values.city || undefined,
+        motherParity: values.mother_parity ? Number(values.mother_parity) : undefined,
+        birthDate: values.date_of_birth ? format(new Date(values.date_of_birth), 'yyyy-MM-dd') : undefined,
+        birthTime: values.birth_time || undefined,
+        gender: values.gender ? values.gender.toLowerCase() : undefined,
+        placeOfBirth: values.place_of_birth ? values.place_of_birth.toUpperCase() : undefined,
+        birthWeight: values.birth_weight ? Number(values.birth_weight) : undefined,
+        birthType: values.birth_type || 'singleton',
+        deliveryMethod: values.delivery_type
+          ? values.delivery_type.toLowerCase().replace('caesarean section', 'caesarean_section').replace(' ', '_')
+          : undefined,
+        facilityId: isValidUUID(values.facility_id) ? values.facility_id : undefined,
+        apgarScoreOneMin: values.apgar_score_one_min ? Number(values.apgar_score_one_min) : undefined,
+        apgarScoreFiveMin: values.apgar_score_five_min ? Number(values.apgar_score_five_min) : undefined,
+        notes: values.notes || undefined,
+        complications: values.complications || undefined,
+        birthDefects: values.birth_defects || undefined,
+        resuscitation: values.resuscitation || false,
       };
+
+      // Remove undefined fields
+      Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
 
       if (isEditMode) {
         // Update existing birth record
         await execute(
           birthService.updateBirth,
-          [id, formattedValues],
+          [id, payload],
           (response) => {
             setAlertMessage('Birth record updated successfully');
             setAlertSeverity('success');
             setAlertOpen(true);
-            
-            // Navigate back to birth detail after a short delay
+
             setTimeout(() => {
               navigate(`/births/${id}`);
             }, 1500);
@@ -256,21 +216,20 @@ const BirthForm = () => {
         // Create new birth record
         await execute(
           birthService.createBirth,
-          [formattedValues],
+          [payload],
           (response) => {
             setAlertMessage('Birth record registered successfully');
             setAlertSeverity('success');
             setAlertOpen(true);
-            
-            // Navigate to the new birth's detail page
+
             setTimeout(() => {
-              navigate(`/births/${response.id}`);
+              navigate(`/births/${response.id || response.data?.id}`);
             }, 1500);
           }
         );
       }
     } catch (err) {
-      setAlertMessage('Failed to save birth record information');
+      setAlertMessage(`Failed to ${isEditMode ? 'update' : 'save'} birth record information`);
       setAlertSeverity('error');
       setAlertOpen(true);
     }
@@ -287,34 +246,81 @@ const BirthForm = () => {
   // Load birth data if in edit mode
   useEffect(() => {
     const loadBirth = async () => {
-      if (id && id !== 'new') {
+      if (id && isValidUUID(id)) {
         setIsEditMode(true);
-        
         await execute(
-          birthService.getBirthById,
+          birthService.getBirthById, // Use real service
           [id],
           (response) => {
-            // Transform API response to form values format
-            const birthData = {
-              ...initialBirthValues,
-              ...response,
-              date_of_birth: response.date_of_birth ? new Date(response.date_of_birth) : new Date(),
-              registration_date: response.registration_date ? new Date(response.registration_date) : new Date()
+            const birthData = response.data || response;
+            
+            // Map API response fields to form field names for prefilling
+            const mappedData = {
+              // Child Information
+              child_name: birthData.baby?.firstName || birthData.childName || '',
+              gender: birthData.gender || '',
+              date_of_birth: birthData.birthDate ? new Date(birthData.birthDate) : new Date(),
+              birth_time: birthData.birthTime || '',
+              place_of_birth: birthData.placeOfBirth || '',
+              birth_weight: birthData.birthWeight || '',
+              birth_length: birthData.birthLength || '',
+              head_circumference: birthData.headCircumference || '',
+              birth_type: birthData.birthType || '',
+              delivery_type: birthData.deliveryMethod || '',
+              apgar_score_one_min: birthData.apgarScoreOneMin || '',
+              apgar_score_five_min: birthData.apgarScoreFiveMin || '',
+              hospital_name: birthData.facility?.name || '',
+              
+              // Parents Information
+              mother_name: birthData.mother?.firstName && birthData.mother?.lastName 
+                ? `${birthData.mother.firstName} ${birthData.mother.lastName}` 
+                : birthData.motherName || '',
+              mother_age: birthData.motherAge || '',
+              mother_occupation: birthData.mother?.occupation || birthData.motherOccupation || '',
+              mother_id_number: birthData.motherId || '',
+              mother_phone: birthData.mother?.phoneNumber || '',
+              mother_lga_origin: birthData.motherLgaOrigin || '',
+              mother_lga_residence: birthData.motherLgaResidence || '',
+              mother_parity: birthData.motherParity || '',
+              
+              father_name: birthData.fatherName || '',
+              father_age: birthData.fatherAge || '',
+              father_occupation: birthData.fatherOccupation || '',
+              father_id_number: birthData.fatherId || '',
+              father_phone: birthData.fatherPhone || '',
+              
+              // Address Information
+              address: birthData.mother?.address || '',
+              city: birthData.mother?.city || birthData.motherLgaResidence || '',
+              state: birthData.mother?.state || 'Akwa Ibom',
+              
+              // Birth Details
+              complications: birthData.complications || '',
+              notes: birthData.notes || '',
+              birth_defects: birthData.birthDefects || '',
+              resuscitation: birthData.resuscitation || false,
+              
+              // Registration Information
+              facility_id: birthData.facilityId || '',
+              birth_attendant: birthData.attendedBy || '',
+              registration_date: birthData.createdAt ? new Date(birthData.createdAt) : new Date(),
+              status: birthData.isBirthCertificateIssued ? 'registered' : 'pending',
             };
             
+            // Set the mapped data to formik to prefill the form
+            formik.setValues(mappedData);
             setBirth(birthData);
-            
-            // Set formik values
-            Object.keys(birthData).forEach(key => {
-              formik.setFieldValue(key, birthData[key], false);
-            });
           }
         );
+      } else if (id && !isValidUUID(id)) {
+        // Handle case where ID is not a valid UUID
+        console.error('Invalid birth ID format');
+        navigate('/births');
       }
     };
-    
+
     loadBirth();
-  }, [id]);
+  }, [id, execute, navigate]);
 
   // Handle form cancellation
   const handleCancel = () => {

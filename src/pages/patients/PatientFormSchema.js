@@ -9,6 +9,8 @@ export const patientValidationSchema = Yup.object({
   lastName: Yup.string()
     .required('Last name is required')
     .min(2, 'Last name must be at least 2 characters'),
+  otherNames: Yup.string()
+    .nullable(),
   gender: Yup.string()
     .required('Gender is required'),
   dateOfBirth: Yup.date()
@@ -25,12 +27,7 @@ export const patientValidationSchema = Yup.object({
     .required('State is required'),
   lgaResidence: Yup.string()
     .required('LGA Residence is required'),
-  lgaOrigin: Yup.string()
-    .required('LGA Origin is required'),
-  // ❌ Removed: facilityId - backend handles from user token
-  // ❌ Removed: registrationDate - backend sets current date
-  postalCode: Yup.string()
-    .nullable(),
+  // lgaOrigin, postalCode, etc. can be left as optional or removed if not needed
   email: Yup.string()
     .email('Invalid email format')
     .nullable(),
@@ -39,9 +36,9 @@ export const patientValidationSchema = Yup.object({
   genotype: Yup.string()
     .nullable(),
   maritalStatus: Yup.string()
-    .nullable(),
+    .required('Marital status is required'),
   occupation: Yup.string()
-    .nullable(),
+    .required('Occupation is required'),
   emergencyContactRelationship: Yup.string()
     .nullable(),
   emergencyContactName: Yup.string()
@@ -68,10 +65,9 @@ export const initialPatientValues = {
   dateOfBirth: null,
   phoneNumber: '',
   address: '',
-  lgaOrigin: '',
+  city: '',
   lgaResidence: '',
-  state: '', // Let user choose, don't default to Akwa Ibom
-  postalCode: '',
+  state: '',
   email: '',
   bloodGroup: '',
   genotype: '',

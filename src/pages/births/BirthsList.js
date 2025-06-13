@@ -73,7 +73,8 @@ const BirthsList = () => {
     deliveryMethod: '',
     birthType: '',
     lgaResidence: '',
-    status: ''
+    status: '',
+    placeOfBirth: '', // <-- Add this line
   });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -83,65 +84,106 @@ const BirthsList = () => {
   const [viewMode, setViewMode] = useState('table');
   const [tabValue, setTabValue] = useState(0);
 
+  // Add a separate function to fetch counts
+  const fetchBirthCounts = async () => {
+    try {
+      // Fetch all births without pagination to get accurate counts
+      const response = await getAllBirths({ limit: 1000 }); // Large limit to get all
+      if (response && response.data && response.data.births) {
+        calculateBirthCounts(response.data.births);
+      }
+    } catch (error) {
+      console.error('Error fetching birth counts:', error);
+    }
+  };
+
   // Fetch birth records
   const fetchBirths = async () => {
     try {
+      // Map frontend filters to API query params
       const queryParams = {
         page: page + 1,
         limit: pageSize,
-        search: searchTerm,
-        ...filters
+        facilityId: filters.facilityId || undefined,
+        startDate: filters.startDate || undefined,
+        endDate: filters.endDate || undefined,
+        gender: filters.gender || undefined,
+        deliveryMethod: filters.deliveryMethod || undefined,
+        birthType: filters.birthType || undefined,
+        placeOfBirth: filters.placeOfBirth || undefined,
+        lgaResidence: filters.lgaResidence || undefined,
+        search: searchTerm || undefined,
       };
 
-      // Remove empty parameters
+      // Remove undefined parameters
       Object.keys(queryParams).forEach(key => {
-        if (queryParams[key] === '' || queryParams[key] === null || queryParams[key] === undefined) {
+        if (queryParams[key] === undefined || queryParams[key] === '') {
           delete queryParams[key];
         }
       });
 
-      console.log('🔍 Fetching births with params:', queryParams);
-      
       const response = await getAllBirths(queryParams);
-      console.log('🔍 API Response:', response);
 
+      // The API returns: { status, message, data: { births, totalItems, totalPages, ... } }
       if (response && response.data) {
-        const { births = [], total = 0, counts = {} } = response.data;
-        
-        setBirths(births);
-        setTotalBirths(total);
-        
-        // Store all births data for count calculations (only on initial load or when no filters)
-        if (!searchTerm && Object.values(filters).every(v => v === '')) {
-          setAllBirthsData(births);
-          setBirthCounts({
-            total: counts.total || total,
-            registered: counts.registered || births.filter(b => b.status === 'registered').length,
-            pending: counts.pending || births.filter(b => b.status === 'pending').length,
-            hospital: counts.hospital || births.filter(b => b.delivery_method === 'hospital').length,
-            home: counts.home || births.filter(b => b.delivery_method === 'home').length
-          });
+        let { births = [], totalItems = 0 } = response.data;
+
+        // Apply client-side status filtering if needed
+        if (filters.status === 'registered') {
+          births = births.filter(birth => birth.isBirthCertificateIssued === true);
+        } else if (filters.status === 'pending') {
+          births = births.filter(birth => birth.isBirthCertificateIssued === false);
         }
-        
-        console.log('🔍 Setting births:', births.length);
-        console.log('🔍 Birth counts:', birthCounts);
-        
+
+        const mappedBirths = births.map(birth => ({
+          ...birth,
+          id: birth.id,
+          registration_number: birth.baby?.uniqueIdentifier || birth.id,
+          child_name: birth.baby?.firstName || 
+            `Baby ${birth.gender === 'male' ? 'Boy' : birth.gender === 'female' ? 'Girl' : ''}`,
+          gender: birth.gender,
+          date_of_birth: birth.birthDate || birth.date_of_birth,
+          birth_weight: birth.birthWeight || birth.birth_weight,
+          delivery_method: birth.deliveryMethod || birth.delivery_method,
+          birth_type: birth.birthType || birth.birth_type,
+          mother_name: birth.mother?.firstName && birth.mother?.lastName 
+            ? `${birth.mother.firstName} ${birth.mother.lastName}` 
+            : birth.motherName || birth.mother_name,
+          father_name: birth.fatherName || birth.father_name,
+          status: birth.isBirthCertificateIssued ? 'registered' : 'pending',
+        }));
+
+        setBirths(mappedBirths);
+        setTotalBirths(totalItems); // Use totalItems from API, not filtered length
       } else {
-        console.warn('Unexpected response structure:', response);
         setBirths([]);
         setTotalBirths(0);
       }
-      
     } catch (error) {
-      console.error('Error fetching births:', error);
       setBirths([]);
       setTotalBirths(0);
     }
   };
 
+  // Calculate birth counts after fetching data
+  const calculateBirthCounts = (birthsData) => {
+    const counts = {
+      total: birthsData.length,
+      registered: birthsData.filter(birth => birth.isBirthCertificateIssued === true).length,
+      pending: birthsData.filter(birth => birth.isBirthCertificateIssued === false).length,
+      hospital: birthsData.filter(birth => birth.placeOfBirth === 'HOSPITAL').length,
+      home: birthsData.filter(birth => birth.placeOfBirth === 'HOME').length,
+    };
+    setBirthCounts(counts);
+  };
+
   // Initial data loading
   useEffect(() => {
     fetchBirths();
+    // Only fetch counts when we're on first page with no filters/search
+    if (page === 0 && !searchTerm && Object.values(filters).every(v => v === '')) {
+      fetchBirthCounts();
+    }
   }, [page, pageSize, searchTerm, filters]);
 
   // Handle search
@@ -181,7 +223,8 @@ const BirthsList = () => {
       deliveryMethod: '',
       birthType: '',
       lgaResidence: '',
-      status: ''
+      status: '',
+      placeOfBirth: '', // Add this missing field
     });
     setPage(0);
     setFilterAnchorEl(null);
@@ -201,7 +244,8 @@ const BirthsList = () => {
       deliveryMethod: '',
       birthType: '',
       lgaResidence: '',
-      status: ''
+      status: '',
+      placeOfBirth: '', // Add this missing field
     };
 
     switch(newValue) {
@@ -209,16 +253,18 @@ const BirthsList = () => {
         // No additional filters needed
         break;
       case 1: // Registered
+        // Filter by birth certificate issued status
         newFilters.status = 'registered';
         break;
       case 2: // Pending
+        // Filter by pending certificate status
         newFilters.status = 'pending';
         break;
       case 3: // Hospital Births
-        newFilters.deliveryMethod = 'hospital';
-   
+        newFilters.placeOfBirth = 'HOSPITAL';
+        break;
       case 4: // Home Births
-        newFilters.deliveryMethod = 'home';
+        newFilters.placeOfBirth = 'HOME';
         break;
       default:
         break;
@@ -634,11 +680,21 @@ const BirthsList = () => {
                   label="Facility"
                 >
                   <MenuItem value="">All Facilities</MenuItem>
-                  <MenuItem value="facility-1">University of Uyo Teaching Hospital</MenuItem>
-                  <MenuItem value="facility-2">Ibom Specialist Hospital</MenuItem>
-                  <MenuItem value="facility-3">General Hospital Uyo</MenuItem>
-                  <MenuItem value="facility-4">St. Luke's Hospital</MenuItem>
-                  <MenuItem value="facility-5">Primary Health Center</MenuItem>
+                  {/* Remove dummy facility options */}
+                </Select>
+              </FormControl>
+              
+              <FormControl fullWidth margin="dense" size="small">
+                <InputLabel>Place of Birth</InputLabel>
+                <Select
+                  name="placeOfBirth"
+                  value={filters.placeOfBirth}
+                  onChange={handleFilterChange}
+                  label="Place of Birth"
+                >
+                  <MenuItem value="">All</MenuItem>
+                  <MenuItem value="HOSPITAL">Hospital</MenuItem>
+                  <MenuItem value="HOME">Home</MenuItem>
                 </Select>
               </FormControl>
               
@@ -732,6 +788,10 @@ const BirthsList = () => {
                     displayKey = 'Status';
                     displayValue = value.charAt(0).toUpperCase() + value.slice(1);
                     break;
+                  case 'placeOfBirth':
+                    displayKey = 'Place of Birth';
+                    displayValue = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+                    break;
                   default:
                     displayKey = key.charAt(0).toUpperCase() + key.slice(1);
                 }
@@ -806,7 +866,7 @@ const BirthsList = () => {
               onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
               onPageChange={(newPage) => setPage(newPage)}
               rowCount={totalBirths}
-              paginationMode="client"
+              paginationMode="server" // Change from "client" to "server"
               page={page}
               autoHeight
               disableSelectionOnClick

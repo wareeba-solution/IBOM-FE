@@ -63,7 +63,7 @@ import {
 import { format, parseISO, differenceInDays } from 'date-fns';
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
-import { 
+import {
    TimelineDot,
    Timeline,
    TimelineItem,
@@ -72,6 +72,8 @@ import {
    TimelineConnector,
    TimelineContent
 } from '@mui/lab';
+import diseaseService from '../../services/diseaseService';
+import patientService from '../../services/patientService'; // If available
 
 // Helper function to create a valid date
 function createValidDateString(year, month, day) {
@@ -105,7 +107,7 @@ function addDaysToDateString(dateString, daysToAdd) {
 
 // Mock disease service - replace with actual service when available
 // Mock disease service - replace with actual service when available
-const diseaseService = {
+const diseaseServiceMock = {
   getDiseaseById: async (id) => {
     // Simulate API call
     return new Promise((resolve) => {
@@ -357,16 +359,130 @@ const DiseaseDetail = () => {
   useEffect(() => {
     const loadDiseaseCase = async () => {
       await execute(
-        diseaseService.getDiseaseById,
+        diseaseService.getDiseaseCaseById,
         [id],
-        (response) => {
-          setDiseaseCase(response);
+        async (response) => {
+          console.log('Loaded disease case:', response);
+          
+          // Map API response to component format
+          const apiData = response.data || response;
+          const mappedCase = diseaseService.mapDiseaseCase(apiData);
+          
+          // Try to get patient information
+          try {
+            if (mappedCase.patient_id && patientService) {
+              const patientData = await patientService.getPatientById(mappedCase.patient_id);
+              if (patientData) {
+                mappedCase.patient_name = patientData.firstName && patientData.lastName ? 
+                  `${patientData.firstName} ${patientData.lastName}${patientData.otherNames ? ' ' + patientData.otherNames : ''}` :
+                  patientData.name || mappedCase.patient_name || 'Unknown Patient';
+                mappedCase.age = patientData.age || calculateAge(patientData.dateOfBirth);
+                mappedCase.gender = patientData.gender;
+                mappedCase.phone_number = patientData.phoneNumber;
+                mappedCase.email = patientData.email;
+                mappedCase.address = patientData.address;
+                mappedCase.occupation = patientData.occupation;
+                mappedCase.date_of_birth = patientData.dateOfBirth;
+              }
+            }
+          } catch (patientError) {
+            console.warn('Could not fetch patient data:', patientError);
+          }
+          
+          // Try to get contacts
+          try {
+            const contactsResponse = await diseaseService.getContacts(id);
+            mappedCase.contacts = contactsResponse.data || [];
+          } catch (contactError) {
+            console.warn('Could not fetch contacts:', contactError);
+            mappedCase.contacts = [];
+          }
+          
+          // Generate case history from available data
+          mappedCase.case_history = generateCaseHistory(mappedCase);
+          
+          setDiseaseCase(mappedCase);
         }
       );
     };
     
     loadDiseaseCase();
   }, [id, execute]);
+
+  // Helper function to calculate age
+  const calculateAge = (dateOfBirth) => {
+    if (!dateOfBirth) return null;
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  // Helper function to generate case history from case data
+  const generateCaseHistory = (caseData) => {
+    const history = [];
+    
+    if (caseData.report_date) {
+      history.push({
+        date: caseData.report_date,
+        action: 'Case Reported',
+        details: `${caseData.disease_type} case reported to health facility`,
+        performed_by: caseData.reported_by || 'Health Facility Staff'
+      });
+    }
+    
+    if (caseData.diagnosis_date) {
+      history.push({
+        date: caseData.diagnosis_date,
+        action: 'Diagnosis Made',
+        details: `${caseData.diagnosis_type} diagnosis confirmed`,
+        performed_by: 'Medical Officer'
+      });
+    }
+    
+    if (caseData.lab_test_results?.testDate) {
+      history.push({
+        date: caseData.lab_test_results.testDate,
+        action: 'Lab Results Received',
+        details: `${caseData.lab_test_results.testType}: ${caseData.lab_test_results.result}`,
+        performed_by: 'Laboratory Technician'
+      });
+    }
+    
+    if (caseData.admission_date) {
+      history.push({
+        date: caseData.admission_date,
+        action: 'Hospital Admission',
+        details: `Patient admitted to ${caseData.hospital_name || 'hospital'}`,
+        performed_by: 'Medical Officer'
+      });
+    }
+    
+    if (caseData.discharge_date) {
+      history.push({
+        date: caseData.discharge_date,
+        action: 'Hospital Discharge',
+        details: 'Patient discharged with follow-up instructions',
+        performed_by: 'Medical Officer'
+      });
+    }
+    
+    if (caseData.outcome_date && caseData.outcome === 'death') {
+      history.push({
+        date: caseData.outcome_date,
+        action: 'Deceased',
+        details: 'Patient succumbed to illness',
+        performed_by: 'Medical Officer'
+      });
+    }
+    
+    // Sort by date
+    return history.sort((a, b) => new Date(a.date) - new Date(b.date));
+  };
 
   // Handle tab change
   const handleTabChange = (event, newValue) => {
@@ -442,7 +558,7 @@ const DiseaseDetail = () => {
           // Update local state with new contact
           setDiseaseCase(prev => ({
             ...prev,
-            contacts: [...prev.contacts, response.contact]
+            contacts: [...prev.contacts, response.data || response.contact || newContact]
           }));
           handleContactDialogClose();
         }
@@ -607,10 +723,10 @@ const DiseaseDetail = () => {
 
   return (
     <MainLayout 
-      title={`${diseaseCase.disease_type} Case: ${diseaseCase.case_id}`}
+      title={`${diseaseCase?.disease_type || 'Disease'} Case: ${diseaseCase?.case_id || 'Loading...'}`}
       breadcrumbs={[
         { name: 'Diseases', path: '/diseases' },
-        { name: diseaseCase.case_id, active: true }
+        { name: diseaseCase?.case_id || 'Loading...', active: true }
       ]}
     >
       <Paper sx={{ p: 3, mb: 3 }}>

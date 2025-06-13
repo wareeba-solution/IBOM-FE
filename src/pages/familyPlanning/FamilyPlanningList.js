@@ -49,89 +49,8 @@ import {
 import { format, parseISO, subMonths } from 'date-fns';
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
-
-// Mock family planning service - replace with actual service when available
-const familyPlanningService = {
-  getAllRecords: async (params) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          data: mockFamilyPlanningData,
-          meta: {
-            total: mockFamilyPlanningData.length,
-            page: params.page || 1,
-            per_page: params.per_page || 10
-          }
-        });
-      }, 500);
-    });
-  },
-  deleteRecord: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 300);
-    });
-  }
-};
-
-// Contraceptive methods
-const contraceptiveMethods = [
-  'Oral Contraceptives',
-  'Injectable Contraceptives',
-  'Intrauterine Device (IUD)',
-  'Implant',
-  'Condoms',
-  'Female Sterilization',
-  'Male Sterilization',
-  'Natural Family Planning',
-  'Emergency Contraception',
-  'Other'
-];
-
-// Visit types
-const visitTypes = [
-  'Initial Consultation',
-  'Follow-up',
-  'Method Change',
-  'Method Renewal',
-  'Side Effects Consultation',
-  'Counseling Only',
-  'Removal',
-  'Other'
-];
-
-// Mock family planning data
-const mockFamilyPlanningData = Array.from({ length: 50 }, (_, i) => {
-  const visitDate = subMonths(new Date(), i % 12);
-  const nextVisitDate = new Date(visitDate);
-  nextVisitDate.setMonth(nextVisitDate.getMonth() + 3);
-  
-  const age = 18 + (i % 30);
-  const isMale = i % 10 === 0; // Mostly female clients, but some male for condoms or vasectomy
-  
-  return {
-    id: i + 1,
-    record_id: `FP${10000 + i}`,
-    patient_name: `${isMale ? 'John' : 'Jane'} ${['Doe', 'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Miller'][i % 7]} ${i + 1}`,
-    patient_id: `PT${5000 + i}`,
-    age: age,
-    gender: isMale ? 'Male' : 'Female',
-    visit_date: visitDate.toISOString().split('T')[0],
-    next_visit_date: nextVisitDate.toISOString().split('T')[0],
-    visit_type: visitTypes[i % visitTypes.length],
-    method: isMale ? 
-      (i % 5 === 0 ? 'Male Sterilization' : 'Condoms') : 
-      contraceptiveMethods[i % (contraceptiveMethods.length - 2)], // Exclude male methods for females
-    location: `${['Uyo', 'Ikot Ekpene', 'Eket', 'Oron', 'Abak'][i % 5]} Health Center`,
-    provider: `Provider ${i % 10 + 1}`,
-    has_side_effects: (i % 7 === 0),
-    is_new_acceptor: (i % 5 === 0),
-    created_at: visitDate.toISOString()
-  };
-});
+import familyPlanningService from '../../services/familyPlanningService';
+import patientService from '../../services/patientService'; // If available
 
 // Family Planning List Component
 const FamilyPlanningList = () => {
@@ -143,42 +62,189 @@ const FamilyPlanningList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
   const [filters, setFilters] = useState({
-    method: '',
-    visit_type: '',
-    date_range: '',
-    is_new_acceptor: ''
+    methodId: '',
+    serviceType: '',
+    serviceDateFrom: '',
+    serviceDateTo: '',
+    patientSatisfaction: ''
   });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [totalRecords, setTotalRecords] = useState(0);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
+  const [viewMode, setViewMode] = useState('table');
   const [tabValue, setTabValue] = useState(0);
+  const [methods, setMethods] = useState([]);
+
+  // Service types from API
+  const serviceTypes = [
+    'Initial Adoption',
+    'Method Switch',
+    'Resupply',
+    'Follow-up',
+    'Counseling',
+    'Removal',
+    'Other'
+  ];
+
+  // Patient satisfaction levels from API
+  const satisfactionLevels = [
+    'Very Satisfied',
+    'Satisfied',
+    'Neutral',
+    'Dissatisfied',
+    'Very Dissatisfied',
+    'Not Recorded'
+  ];
+
+  // Fetch family planning methods for filter dropdown
+  useEffect(() => {
+    const loadMethods = async () => {
+      try {
+        const response = await familyPlanningService.getFamilyPlanningMethods();
+        setMethods(response.data || []);
+      } catch (error) {
+        console.error('Failed to load family planning methods:', error);
+      }
+    };
+    
+    loadMethods();
+  }, []);
 
   // Fetch family planning records
   const fetchRecords = async () => {
-    const queryParams = {
-      page: page + 1,
-      per_page: pageSize,
-      search: searchTerm,
-      ...filters
-    };
+    try {
+      // Map frontend filters to API query params
+      const queryParams = {
+        page: page + 1,
+        limit: pageSize,
+        sortBy: 'serviceDate',
+        sortOrder: 'desc'
+      };
 
-    const result = await execute(
-      familyPlanningService.getAllRecords,
-      [queryParams],
-      (response) => {
-        setRecords(response.data);
-        setTotalRecords(response.meta.total);
+      // Add search term if provided
+      if (searchTerm) {
+        queryParams.search = searchTerm;
       }
-    );
+
+      // Add filters
+      Object.keys(filters).forEach(key => {
+        if (filters[key] && filters[key] !== '') {
+          queryParams[key] = filters[key];
+        }
+      });
+
+      // Add tab-specific filters
+      switch (tabValue) {
+        case 1: // New Acceptors
+          queryParams.serviceType = 'Initial Adoption';
+          break;
+        case 2: // Follow-ups
+          queryParams.serviceType = 'Follow-up';
+          break;
+        case 3: // This Month
+          const now = new Date();
+          const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+          queryParams.serviceDateFrom = firstDay.toISOString().split('T')[0];
+          break;
+        case 4: // Side Effects
+          // This would need a specific API parameter or we filter client-side
+          break;
+        default:
+          // All Records - no additional filters
+          break;
+      }
+
+      console.log('Fetching family planning services with params:', queryParams);
+
+      await execute(
+        familyPlanningService.getAllFamilyPlanningServices,
+        [queryParams],
+        async (response) => {
+          console.log('API response:', response);
+          
+          // Handle the response structure
+          const services = response.data || [];
+          const pagination = response.pagination || { total: services.length };
+
+          // Map the services and enhance with client/method data
+          const mappedServices = await Promise.all(
+            services.map(async (serviceItem) => {
+              const mappedService = familyPlanningService.mapFamilyPlanningService(serviceItem);
+              
+              // Try to get client information
+              try {
+                if (mappedService.client_id && patientService) {
+                  const clientData = await patientService.getPatientById(mappedService.client_id);
+                  if (clientData) {
+                    mappedService.patient_name = clientData.firstName && clientData.lastName ? 
+                      `${clientData.firstName} ${clientData.lastName}${clientData.otherNames ? ' ' + clientData.otherNames : ''}` :
+                      clientData.name || mappedService.patient_name || 'Unknown Client';
+                    mappedService.age = clientData.age || calculateAge(clientData.dateOfBirth);
+                    mappedService.gender = clientData.gender;
+                    mappedService.marital_status = clientData.maritalStatus;
+                    mappedService.education_level = clientData.educationLevel;
+                  }
+                }
+              } catch (clientError) {
+                console.warn('Could not fetch client data for:', mappedService.client_id, clientError);
+                // Use a fallback name
+                if (!mappedService.patient_name || mappedService.patient_name === 'Loading...') {
+                  mappedService.patient_name = `Client ${mappedService.client_id ? mappedService.client_id.substring(0, 8) : 'Unknown'}`;
+                }
+              }
+
+              // Try to get method information
+              try {
+                if (mappedService.method_id && methods.length > 0) {
+                  const method = methods.find(m => m.id === mappedService.method_id);
+                  if (method) {
+                    mappedService.method = method.name;
+                  }
+                }
+              } catch (methodError) {
+                console.warn('Could not map method for:', mappedService.method_id);
+              }
+
+              return mappedService;
+            })
+          );
+
+          // Filter for side effects tab if needed (client-side filtering)
+          let finalServices = mappedServices;
+          if (tabValue === 4) { // Side Effects tab
+            finalServices = mappedServices.filter(service => service.has_side_effects);
+          }
+
+          setRecords(finalServices);
+          setTotalRecords(pagination.total || finalServices.length);
+        }
+      );
+    } catch (error) {
+      console.error('Error fetching family planning services:', error);
+      setRecords([]);
+      setTotalRecords(0);
+    }
+  };
+
+  // Helper function to calculate age from date of birth
+  const calculateAge = (dateOfBirth) => {
+    if (!dateOfBirth) return null;
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
   };
 
   // Initial data loading
   useEffect(() => {
     fetchRecords();
-  }, [page, pageSize, searchTerm, filters]);
+  }, [page, pageSize, searchTerm, filters, tabValue, methods]);
 
   // Handle search
   const handleSearch = (event) => {
@@ -210,10 +276,11 @@ const FamilyPlanningList = () => {
 
   const handleClearFilters = () => {
     setFilters({
-      method: '',
-      visit_type: '',
-      date_range: '',
-      is_new_acceptor: ''
+      methodId: '',
+      serviceType: '',
+      serviceDateFrom: '',
+      serviceDateTo: '',
+      patientSatisfaction: ''
     });
     setPage(0);
     setFilterAnchorEl(null);
@@ -283,33 +350,139 @@ const FamilyPlanningList = () => {
     }
   };
 
-  // Table columns
+  // Updated filter menu with API-compatible options
+  const renderFilterMenu = () => (
+    <Menu
+      anchorEl={filterAnchorEl}
+      open={Boolean(filterAnchorEl)}
+      onClose={handleFilterClose}
+      PaperProps={{
+        style: {
+          width: 320,
+          maxHeight: 400
+        },
+      }}
+    >
+      <Box sx={{ p: 2 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Filter Services
+        </Typography>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Method</InputLabel>
+          <Select
+            name="methodId"
+            value={filters.methodId}
+            onChange={handleFilterChange}
+            label="Method"
+          >
+            <MenuItem value="">All Methods</MenuItem>
+            {methods.map((method) => (
+              <MenuItem key={method.id} value={method.id}>
+                {method.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Service Type</InputLabel>
+          <Select
+            name="serviceType"
+            value={filters.serviceType}
+            onChange={handleFilterChange}
+            label="Service Type"
+          >
+            <MenuItem value="">All Service Types</MenuItem>
+            {serviceTypes.map((type) => (
+              <MenuItem key={type} value={type}>{type}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Patient Satisfaction</InputLabel>
+          <Select
+            name="patientSatisfaction"
+            value={filters.patientSatisfaction}
+            onChange={handleFilterChange}
+            label="Patient Satisfaction"
+          >
+            <MenuItem value="">All</MenuItem>
+            {satisfactionLevels.map((level) => (
+              <MenuItem key={level} value={level}>{level}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        
+        <TextField
+          fullWidth
+          margin="dense"
+          size="small"
+          label="Service Date From"
+          name="serviceDateFrom"
+          type="date"
+          value={filters.serviceDateFrom}
+          onChange={handleFilterChange}
+          InputLabelProps={{ shrink: true }}
+        />
+        
+        <TextField
+          fullWidth
+          margin="dense"
+          size="small"
+          label="Service Date To"
+          name="serviceDateTo"
+          type="date"
+          value={filters.serviceDateTo}
+          onChange={handleFilterChange}
+          InputLabelProps={{ shrink: true }}
+        />
+        
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button onClick={handleClearFilters} size="small">
+            Clear Filters
+          </Button>
+          <Button 
+            onClick={handleFilterClose} 
+            variant="contained" 
+            size="small" 
+            sx={{ ml: 1 }}
+          >
+            Apply
+          </Button>
+        </Box>
+      </Box>
+    </Menu>
+  );
+
+  // Updated table columns for API data structure
   const columns = [
     { field: 'record_id', headerName: 'Record ID', width: 120 },
-    { field: 'patient_name', headerName: 'Patient Name', width: 180 },
+    { field: 'patient_name', headerName: 'Client Name', width: 180 },
     { 
       field: 'gender', 
       headerName: 'Gender', 
       width: 100,
       renderCell: (params) => (
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          {params.value === 'Female' ? 
+          {params.value === 'female' ? 
             <FemaleIcon color="secondary" fontSize="small" sx={{ mr: 1 }} /> : 
             <MaleIcon color="primary" fontSize="small" sx={{ mr: 1 }} />
           }
-          {params.value}
+          {params.value ? params.value.charAt(0).toUpperCase() + params.value.slice(1) : 'N/A'}
         </Box>
       )
     },
     { field: 'age', headerName: 'Age', width: 80, type: 'number' },
     { 
-      field: 'visit_date', 
-      headerName: 'Visit Date', 
+      field: 'service_date', 
+      headerName: 'Service Date', 
       width: 120,
       valueFormatter: (params) => formatDate(params.value)
     },
     { field: 'method', headerName: 'Method', width: 180 },
-    { field: 'visit_type', headerName: 'Visit Type', width: 180 },
+    { field: 'service_type', headerName: 'Service Type', width: 180 },
     { 
       field: 'is_new_acceptor', 
       headerName: 'New Acceptor', 
@@ -321,7 +494,7 @@ const FamilyPlanningList = () => {
       )
     },
     { 
-      field: 'next_visit_date', 
+      field: 'next_appointment', 
       headerName: 'Next Visit', 
       width: 120,
       valueFormatter: (params) => formatDate(params.value)
@@ -507,96 +680,7 @@ const FamilyPlanningList = () => {
             Filter
           </Button>
           
-          <Menu
-            anchorEl={filterAnchorEl}
-            open={Boolean(filterAnchorEl)}
-            onClose={handleFilterClose}
-            PaperProps={{
-              style: {
-                width: 280,
-              },
-            }}
-          >
-            <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Filter Records
-              </Typography>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Method</InputLabel>
-                <Select
-                  name="method"
-                  value={filters.method}
-                  onChange={handleFilterChange}
-                  label="Method"
-                >
-                  <MenuItem value="">All Methods</MenuItem>
-                  {contraceptiveMethods.map((method) => (
-                    <MenuItem key={method} value={method}>{method}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Visit Type</InputLabel>
-                <Select
-                  name="visit_type"
-                  value={filters.visit_type}
-                  onChange={handleFilterChange}
-                  label="Visit Type"
-                >
-                  <MenuItem value="">All Visit Types</MenuItem>
-                  {visitTypes.map((type) => (
-                    <MenuItem key={type} value={type}>{type}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>New Acceptor</InputLabel>
-                <Select
-                  name="is_new_acceptor"
-                  value={filters.is_new_acceptor}
-                  onChange={handleFilterChange}
-                  label="New Acceptor"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  <MenuItem value="true">Yes</MenuItem>
-                  <MenuItem value="false">No</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Date Range</InputLabel>
-                <Select
-                  name="date_range"
-                  value={filters.date_range}
-                  onChange={handleFilterChange}
-                  label="Date Range"
-                >
-                  <MenuItem value="">All Time</MenuItem>
-                  <MenuItem value="last_week">Last Week</MenuItem>
-                  <MenuItem value="last_month">Last Month</MenuItem>
-                  <MenuItem value="last_3_months">Last 3 Months</MenuItem>
-                  <MenuItem value="last_year">Last Year</MenuItem>
-                </Select>
-              </FormControl>
-              
-              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                <Button onClick={handleClearFilters} size="small">
-                  Clear Filters
-                </Button>
-                <Button 
-                  onClick={handleFilterClose} 
-                  variant="contained" 
-                  size="small" 
-                  sx={{ ml: 1 }}
-                >
-                  Apply
-                </Button>
-              </Box>
-            </Box>
-          </Menu>
+          {renderFilterMenu()}
           
           <Button
             variant="outlined"

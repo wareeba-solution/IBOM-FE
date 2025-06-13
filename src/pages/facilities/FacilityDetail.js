@@ -55,88 +55,7 @@ import {
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
 import { format } from 'date-fns';
-
-// Mock facility service - replace with actual service when available
-const facilityService = {
-  getFacilityById: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockFacility = {
-          id,
-          facility_code: `FAC${10000 + parseInt(id)}`,
-          name: `${parseInt(id) % 3 === 0 ? 'General Hospital' : (parseInt(id) % 3 === 1 ? 'Primary Health Center' : 'Medical Clinic')} ${id}`,
-          type: parseInt(id) % 3 === 0 ? 'Hospital' : (parseInt(id) % 3 === 1 ? 'Primary Health Center' : 'Clinic'),
-          level: parseInt(id) % 3 === 0 ? 'Secondary' : (parseInt(id) % 3 === 1 ? 'Primary' : 'Primary'),
-          ownership: parseInt(id) % 4 === 0 ? 'Government' : (parseInt(id) % 4 === 1 ? 'Private' : (parseInt(id) % 4 === 2 ? 'Faith-based' : 'NGO')),
-          address: `Address ${id}, Akwa Ibom`,
-          city: parseInt(id) % 5 === 0 ? 'Uyo' : (parseInt(id) % 5 === 1 ? 'Ikot Ekpene' : (parseInt(id) % 5 === 2 ? 'Eket' : (parseInt(id) % 5 === 3 ? 'Oron' : 'Abak'))),
-          local_govt: parseInt(id) % 5 === 0 ? 'Uyo' : (parseInt(id) % 5 === 1 ? 'Ikot Ekpene' : (parseInt(id) % 5 === 2 ? 'Eket' : (parseInt(id) % 5 === 3 ? 'Oron' : 'Abak'))),
-          state: 'Akwa Ibom',
-          postal_code: `5${id}${id}${id}${id}`,
-          phone: `080${id}${id}${id}${id}${id}${id}${id}${id}`,
-          email: `facility${id}@example.com`,
-          website: parseInt(id) % 3 === 0 ? `www.facility${id}.com` : '',
-          gps_coordinates: `${4 + Math.random() * 2}, ${7 + Math.random() * 2}`,
-          services: [
-            'Outpatient Services',
-            parseInt(id) % 2 === 0 ? 'Surgery' : 'Laboratory Services',
-            parseInt(id) % 3 === 0 ? 'Emergency Services' : 'Pharmacy',
-            parseInt(id) % 4 === 0 ? 'Maternity' : 'Pediatrics'
-          ],
-          beds: parseInt(id) % 3 === 0 ? 50 + parseInt(id) : (parseInt(id) % 3 === 1 ? 20 + parseInt(id) : 10 + parseInt(id)),
-          staff_count: parseInt(id) % 3 === 0 ? 100 + parseInt(id) : (parseInt(id) % 3 === 1 ? 30 + parseInt(id) : 15 + parseInt(id)),
-          head_name: `Dr. ${parseInt(id) % 2 === 0 ? 'John' : 'Jane'} Smith ${id}`,
-          head_title: parseInt(id) % 3 === 0 ? 'Medical Director' : (parseInt(id) % 3 === 1 ? 'Chief Medical Officer' : 'Head Doctor'),
-          registration_date: new Date(2010 + (parseInt(id) % 12), (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          status: parseInt(id) % 10 === 0 ? 'Inactive' : 'Active',
-          last_updated: new Date(2023, (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString(),
-          // Additional mock data for stats
-          staff: {
-            doctors: parseInt(id) % 3 === 0 ? 20 + parseInt(id) % 10 : (parseInt(id) % 3 === 1 ? 8 + parseInt(id) % 5 : 3 + parseInt(id) % 3),
-            nurses: parseInt(id) % 3 === 0 ? 40 + parseInt(id) % 15 : (parseInt(id) % 3 === 1 ? 15 + parseInt(id) % 8 : 5 + parseInt(id) % 5),
-            lab_technicians: parseInt(id) % 3 === 0 ? 10 + parseInt(id) % 5 : (parseInt(id) % 3 === 1 ? 3 + parseInt(id) % 2 : 1),
-            administrative: parseInt(id) % 3 === 0 ? 15 + parseInt(id) % 10 : (parseInt(id) % 3 === 1 ? 5 + parseInt(id) % 3 : 2 + parseInt(id) % 2),
-            other: parseInt(id) % 3 === 0 ? 15 : (parseInt(id) % 3 === 1 ? 5 : 2)
-          },
-          // Mock patient stats
-          patient_stats: {
-            total_patients: parseInt(id) * 250,
-            monthly_average: parseInt(id) * 20,
-            outpatient_ratio: 0.7,
-            inpatient_ratio: 0.3
-          },
-          // Mock beds breakdown
-          beds_breakdown: {
-            general: parseInt(id) % 3 === 0 ? 25 + parseInt(id) % 10 : (parseInt(id) % 3 === 1 ? 10 + parseInt(id) % 5 : 5 + parseInt(id) % 3),
-            pediatric: parseInt(id) % 3 === 0 ? 10 + parseInt(id) % 5 : (parseInt(id) % 3 === 1 ? 5 + parseInt(id) % 3 : 2 + parseInt(id) % 2),
-            maternity: parseInt(id) % 3 === 0 ? 8 + parseInt(id) % 4 : (parseInt(id) % 3 === 1 ? 3 + parseInt(id) % 2 : 1),
-            icu: parseInt(id) % 3 === 0 ? 5 + parseInt(id) % 3 : (parseInt(id) % 3 === 1 ? 0 : 0),
-            emergency: parseInt(id) % 3 === 0 ? 5 : (parseInt(id) % 3 === 1 ? 2 : 1)
-          },
-          // Mock equipment count
-          equipment: [
-            { name: 'X-Ray Machine', count: parseInt(id) % 3 === 0 ? 2 : (parseInt(id) % 3 === 1 ? 1 : 0) },
-            { name: 'Ultrasound Machine', count: parseInt(id) % 3 === 0 ? 3 : (parseInt(id) % 3 === 1 ? 1 : 0) },
-            { name: 'ECG Machine', count: parseInt(id) % 3 === 0 ? 2 : (parseInt(id) % 3 === 1 ? 1 : 0) },
-            { name: 'Ventilator', count: parseInt(id) % 3 === 0 ? 5 : (parseInt(id) % 3 === 1 ? 0 : 0) },
-            { name: 'Defibrillator', count: parseInt(id) % 3 === 0 ? 3 : (parseInt(id) % 3 === 1 ? 1 : 0) },
-            { name: 'Surgical Equipment', count: parseInt(id) % 3 === 0 ? 5 : (parseInt(id) % 3 === 1 ? 2 : 0) }
-          ]
-        };
-        resolve(mockFacility);
-      }, 500);
-    });
-  },
-  deleteFacility: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 300);
-    });
-  }
-};
+import facilityService from '../../services/facilityService';
 
 const FacilityDetail = () => {
   const { id } = useParams();
@@ -151,18 +70,36 @@ const FacilityDetail = () => {
   // Fetch facility details
   useEffect(() => {
     const loadFacility = async () => {
+      console.log('Loading facility with ID:', id);
+      
       await execute(
         facilityService.getFacilityById,
         [id],
         (response) => {
-          setFacility(response);
+          console.log('Loaded facility response:', response);
+          
+          // Ensure we have all required fields for the UI
+          if (response && response.id) {
+            // Add debugging to see what we're setting
+            console.log('Setting facility state:', response);
+            setFacility(response);
+          } else {
+            console.error('Invalid facility response:', response);
+          }
         }
       );
     };
     
-    loadFacility();
-  }, [id]);
-  
+    if (id) {
+      loadFacility();
+    }
+  }, [id, execute]);
+
+  // Add debugging for facility state changes
+  useEffect(() => {
+    console.log('Facility state updated:', facility);
+  }, [facility]);
+
   // Handle tab change
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -223,25 +160,16 @@ const FacilityDetail = () => {
                   </ListItemIcon>
                   <ListItemText 
                     primary="Facility Type" 
-                    secondary={`${facility.type} (${facility.level})`} 
+                    secondary={facility.facilityType?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} 
                   />
                 </ListItem>
                 <ListItem>
                   <ListItemIcon>
-                    <BedIcon color="primary" />
+                    <LocationIcon color="primary" />
                   </ListItemIcon>
                   <ListItemText 
-                    primary="Bed Capacity" 
-                    secondary={facility.beds} 
-                  />
-                </ListItem>
-                <ListItem>
-                  <ListItemIcon>
-                    <PeopleIcon color="primary" />
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary="Staff Count" 
-                    secondary={facility.staff_count} 
+                    primary="Local Government Area" 
+                    secondary={facility.lga} 
                   />
                 </ListItem>
                 <ListItem>
@@ -249,8 +177,8 @@ const FacilityDetail = () => {
                     <PersonIcon color="primary" />
                   </ListItemIcon>
                   <ListItemText 
-                    primary="Head of Facility" 
-                    secondary={`${facility.head_name} (${facility.head_title})`} 
+                    primary="Contact Person" 
+                    secondary={facility.contactPerson} 
                   />
                 </ListItem>
                 <ListItem>
@@ -258,8 +186,17 @@ const FacilityDetail = () => {
                     <CalendarIcon color="primary" />
                   </ListItemIcon>
                   <ListItemText 
-                    primary="Registration Date" 
-                    secondary={formatDate(facility.registration_date)} 
+                    primary="Created Date" 
+                    secondary={formatDate(facility.createdAt)} 
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <CalendarIcon color="primary" />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Last Updated" 
+                    secondary={formatDate(facility.updatedAt)} 
                   />
                 </ListItem>
               </List>
@@ -280,7 +217,7 @@ const FacilityDetail = () => {
                   </ListItemIcon>
                   <ListItemText 
                     primary="Address" 
-                    secondary={`${facility.address}, ${facility.city}, ${facility.local_govt}, ${facility.state}`} 
+                    secondary={`${facility.address}, ${facility.lga}, ${facility.state}`} 
                   />
                 </ListItem>
                 <ListItem>
@@ -289,7 +226,7 @@ const FacilityDetail = () => {
                   </ListItemIcon>
                   <ListItemText 
                     primary="Phone" 
-                    secondary={facility.phone} 
+                    secondary={facility.phoneNumber} 
                   />
                 </ListItem>
                 {facility.email && (
@@ -300,28 +237,6 @@ const FacilityDetail = () => {
                     <ListItemText 
                       primary="Email" 
                       secondary={facility.email} 
-                    />
-                  </ListItem>
-                )}
-                {facility.website && (
-                  <ListItem>
-                    <ListItemIcon>
-                      <WebsiteIcon color="primary" />
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary="Website" 
-                      secondary={facility.website} 
-                    />
-                  </ListItem>
-                )}
-                {facility.gps_coordinates && (
-                  <ListItem>
-                    <ListItemIcon>
-                      <MapIcon color="primary" />
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary="GPS Coordinates" 
-                      secondary={facility.gps_coordinates} 
                     />
                   </ListItem>
                 )}
@@ -337,7 +252,7 @@ const FacilityDetail = () => {
                 Services Offered
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
-                {facility.services.map((service, index) => (
+                {facility.services?.map((service, index) => (
                   <Chip 
                     key={index}
                     label={service}
@@ -356,6 +271,16 @@ const FacilityDetail = () => {
   
   // Render staff tab
   const renderStaffTab = () => {
+    if (!facility?.staff || !facility?.staff_count) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <Typography variant="body1" color="text.secondary">
+            Staff information not available
+          </Typography>
+        </Box>
+      );
+    }
+
     return (
       <Grid container spacing={3}>
         <Grid item xs={12}>
@@ -376,42 +301,42 @@ const FacilityDetail = () => {
                   <TableBody>
                     <TableRow>
                       <TableCell>Doctors</TableCell>
-                      <TableCell align="right">{facility.staff.doctors}</TableCell>
+                      <TableCell align="right">{facility.staff.doctors || 0}</TableCell>
                       <TableCell align="right">
-                        {`${Math.round((facility.staff.doctors / facility.staff_count) * 100)}%`}
+                        {facility.staff_count > 0 ? `${Math.round((facility.staff.doctors / facility.staff_count) * 100)}%` : '0%'}
                       </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>Nurses</TableCell>
-                      <TableCell align="right">{facility.staff.nurses}</TableCell>
+                      <TableCell align="right">{facility.staff.nurses || 0}</TableCell>
                       <TableCell align="right">
-                        {`${Math.round((facility.staff.nurses / facility.staff_count) * 100)}%`}
+                        {facility.staff_count > 0 ? `${Math.round((facility.staff.nurses / facility.staff_count) * 100)}%` : '0%'}
                       </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>Lab Technicians</TableCell>
-                      <TableCell align="right">{facility.staff.lab_technicians}</TableCell>
+                      <TableCell align="right">{facility.staff.lab_technicians || 0}</TableCell>
                       <TableCell align="right">
-                        {`${Math.round((facility.staff.lab_technicians / facility.staff_count) * 100)}%`}
+                        {facility.staff_count > 0 ? `${Math.round((facility.staff.lab_technicians / facility.staff_count) * 100)}%` : '0%'}
                       </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>Administrative</TableCell>
-                      <TableCell align="right">{facility.staff.administrative}</TableCell>
+                      <TableCell align="right">{facility.staff.administrative || 0}</TableCell>
                       <TableCell align="right">
-                        {`${Math.round((facility.staff.administrative / facility.staff_count) * 100)}%`}
+                        {facility.staff_count > 0 ? `${Math.round((facility.staff.administrative / facility.staff_count) * 100)}%` : '0%'}
                       </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>Other Staff</TableCell>
-                      <TableCell align="right">{facility.staff.other}</TableCell>
+                      <TableCell align="right">{facility.staff.other || 0}</TableCell>
                       <TableCell align="right">
-                        {`${Math.round((facility.staff.other / facility.staff_count) * 100)}%`}
+                        {facility.staff_count > 0 ? `${Math.round((facility.staff.other / facility.staff_count) * 100)}%` : '0%'}
                       </TableCell>
                     </TableRow>
                     <TableRow sx={{ fontWeight: 'bold' }}>
                       <TableCell><strong>Total</strong></TableCell>
-                      <TableCell align="right"><strong>{facility.staff_count}</strong></TableCell>
+                      <TableCell align="right"><strong>{facility.staff_count || 0}</strong></TableCell>
                       <TableCell align="right"><strong>100%</strong></TableCell>
                     </TableRow>
                   </TableBody>
@@ -426,6 +351,16 @@ const FacilityDetail = () => {
   
   // Render capacity tab
   const renderCapacityTab = () => {
+    if (!facility?.beds_breakdown || !facility?.beds) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <Typography variant="body1" color="text.secondary">
+            Capacity information not available
+          </Typography>
+        </Box>
+      );
+    }
+
     return (
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
@@ -446,42 +381,42 @@ const FacilityDetail = () => {
                   <TableBody>
                     <TableRow>
                       <TableCell>General</TableCell>
-                      <TableCell align="right">{facility.beds_breakdown.general}</TableCell>
+                      <TableCell align="right">{facility.beds_breakdown.general || 0}</TableCell>
                       <TableCell align="right">
-                        {`${Math.round((facility.beds_breakdown.general / facility.beds) * 100)}%`}
+                        {facility.beds > 0 ? `${Math.round((facility.beds_breakdown.general / facility.beds) * 100)}%` : '0%'}
                       </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>Pediatric</TableCell>
-                      <TableCell align="right">{facility.beds_breakdown.pediatric}</TableCell>
+                      <TableCell align="right">{facility.beds_breakdown.pediatric || 0}</TableCell>
                       <TableCell align="right">
-                        {`${Math.round((facility.beds_breakdown.pediatric / facility.beds) * 100)}%`}
+                        {facility.beds > 0 ? `${Math.round((facility.beds_breakdown.pediatric / facility.beds) * 100)}%` : '0%'}
                       </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>Maternity</TableCell>
-                      <TableCell align="right">{facility.beds_breakdown.maternity}</TableCell>
+                      <TableCell align="right">{facility.beds_breakdown.maternity || 0}</TableCell>
                       <TableCell align="right">
-                        {`${Math.round((facility.beds_breakdown.maternity / facility.beds) * 100)}%`}
+                        {facility.beds > 0 ? `${Math.round((facility.beds_breakdown.maternity / facility.beds) * 100)}%` : '0%'}
                       </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>ICU</TableCell>
-                      <TableCell align="right">{facility.beds_breakdown.icu}</TableCell>
+                      <TableCell align="right">{facility.beds_breakdown.icu || 0}</TableCell>
                       <TableCell align="right">
-                        {`${Math.round((facility.beds_breakdown.icu / facility.beds) * 100)}%`}
+                        {facility.beds > 0 ? `${Math.round((facility.beds_breakdown.icu / facility.beds) * 100)}%` : '0%'}
                       </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>Emergency</TableCell>
-                      <TableCell align="right">{facility.beds_breakdown.emergency}</TableCell>
+                      <TableCell align="right">{facility.beds_breakdown.emergency || 0}</TableCell>
                       <TableCell align="right">
-                        {`${Math.round((facility.beds_breakdown.emergency / facility.beds) * 100)}%`}
+                        {facility.beds > 0 ? `${Math.round((facility.beds_breakdown.emergency / facility.beds) * 100)}%` : '0%'}
                       </TableCell>
                     </TableRow>
                     <TableRow sx={{ fontWeight: 'bold' }}>
                       <TableCell><strong>Total</strong></TableCell>
-                      <TableCell align="right"><strong>{facility.beds}</strong></TableCell>
+                      <TableCell align="right"><strong>{facility.beds || 0}</strong></TableCell>
                       <TableCell align="right"><strong>100%</strong></TableCell>
                     </TableRow>
                   </TableBody>
@@ -506,10 +441,10 @@ const FacilityDetail = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {facility.equipment.map((item, index) => (
+                    {(facility.equipment || []).map((item, index) => (
                       <TableRow key={index}>
-                        <TableCell>{item.name}</TableCell>
-                        <TableCell align="right">{item.count}</TableCell>
+                        <TableCell>{item.name || 'Unknown Equipment'}</TableCell>
+                        <TableCell align="right">{item.count || 0}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -524,6 +459,16 @@ const FacilityDetail = () => {
   
   // Render statistics tab
   const renderStatsTab = () => {
+    if (!facility?.patient_stats) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <Typography variant="body1" color="text.secondary">
+            Patient statistics not available
+          </Typography>
+        </Box>
+      );
+    }
+
     return (
       <Grid container spacing={3}>
         <Grid item xs={12}>
@@ -536,7 +481,7 @@ const FacilityDetail = () => {
                 <Grid item xs={12} sm={6} md={3}>
                   <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
                     <Typography variant="h4">
-                      {facility.patient_stats.total_patients.toLocaleString()}
+                      {(facility.patient_stats.total_patients || 0).toLocaleString()}
                     </Typography>
                     <Typography variant="body2">
                       Total Patients
@@ -546,7 +491,7 @@ const FacilityDetail = () => {
                 <Grid item xs={12} sm={6} md={3}>
                   <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'secondary.light', color: 'secondary.contrastText' }}>
                     <Typography variant="h4">
-                      {facility.patient_stats.monthly_average.toLocaleString()}
+                      {(facility.patient_stats.monthly_average || 0).toLocaleString()}
                     </Typography>
                     <Typography variant="body2">
                       Monthly Average
@@ -556,7 +501,7 @@ const FacilityDetail = () => {
                 <Grid item xs={12} sm={6} md={3}>
                   <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'info.light', color: 'info.contrastText' }}>
                     <Typography variant="h4">
-                      {`${Math.round(facility.patient_stats.outpatient_ratio * 100)}%`}
+                      {`${Math.round((facility.patient_stats.outpatient_ratio || 0) * 100)}%`}
                     </Typography>
                     <Typography variant="body2">
                       Outpatient
@@ -566,7 +511,7 @@ const FacilityDetail = () => {
                 <Grid item xs={12} sm={6} md={3}>
                   <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.light', color: 'warning.contrastText' }}>
                     <Typography variant="h4">
-                      {`${Math.round(facility.patient_stats.inpatient_ratio * 100)}%`}
+                      {`${Math.round((facility.patient_stats.inpatient_ratio || 0) * 100)}%`}
                     </Typography>
                     <Typography variant="body2">
                       Inpatient
@@ -625,8 +570,8 @@ const FacilityDetail = () => {
                       {facility.facility_code}
                     </Typography>
                     <Chip 
-                      label={facility.status} 
-                      color={facility.status === 'Active' ? 'success' : 'default'} 
+                      label={facility.status?.charAt(0).toUpperCase() + facility.status?.slice(1) || 'Unknown'} 
+                      color={facility.status === 'active' ? 'success' : 'default'} 
                       size="small" 
                       variant="outlined" 
                     />

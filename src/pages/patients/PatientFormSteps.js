@@ -25,13 +25,11 @@ export const isStepComplete = (step, formik) => {
       formik.values.address &&
       formik.values.city &&
       formik.values.state &&
-      formik.values.lgaOrigin &&
-      formik.values.lgaResidence &&
+      formik.values.lgaResidence && // <-- keep only lgaResidence
       !formik.errors.address &&
       !formik.errors.city &&
       !formik.errors.state &&
-      !formik.errors.lgaOrigin &&
-      !formik.errors.lgaResidence &&
+      !formik.errors.lgaResidence && // <-- keep only lgaResidence
       !formik.errors.phoneNumber &&
       !formik.errors.email
     );
@@ -65,7 +63,6 @@ export const canSubmit = (formik) => {
     address: formik.values.address,
     city: formik.values.city,
     state: formik.values.state,
-    lgaOrigin: formik.values.lgaOrigin,
     lgaResidence: formik.values.lgaResidence,
     errors: Object.keys(formik.errors),
     errorsCount: Object.keys(formik.errors).length
@@ -79,8 +76,7 @@ export const canSubmit = (formik) => {
     formik.values.address &&
     formik.values.city &&
     formik.values.state &&
-    formik.values.lgaOrigin &&
-    formik.values.lgaResidence &&
+    formik.values.lgaResidence && // <-- keep only lgaResidence
     Object.keys(formik.errors).length === 0
   );
 };
