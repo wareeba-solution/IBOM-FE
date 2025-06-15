@@ -64,45 +64,54 @@ const PatientsList = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
 
-  // Fetch patients data
+  // Fetch patients data - FIXED VERSION
   const fetchPatients = async () => {
     try {
       const queryParams = {
         page: page + 1,
-        limit: pageSize,
-        gender: filters.gender,
-        lgaResidence: filters.lgaResidence,
-        status: filters.status,
-        ageFrom: filters.ageFrom,
-        ageTo: filters.ageTo
+        limit: pageSize
       };
 
-      // Only add non-empty parameters
-      Object.keys(queryParams).forEach(key => {
-        if (queryParams[key] === '' || queryParams[key] === null || queryParams[key] === undefined) {
-          delete queryParams[key];
-        }
-      });
+      // Add search term if provided
+      if (searchTerm && searchTerm.trim() !== '') {
+        queryParams.search = searchTerm.trim();
+      }
+
+      // Add filters only if they have values
+      if (filters.gender) queryParams.gender = filters.gender;
+      if (filters.lgaResidence) queryParams.lgaResidence = filters.lgaResidence;
+      if (filters.status) queryParams.status = filters.status;
+      if (filters.ageFrom) queryParams.ageFrom = filters.ageFrom;
+      if (filters.ageTo) queryParams.ageTo = filters.ageTo;
 
       console.log('🔍 Fetching patients with params:', queryParams);
       
-      const response = await getAllPatients(queryParams);
-      console.log('🔍 API Response:', response);
+      await execute(
+        getAllPatients,
+        [queryParams],
+        (response) => {
+          console.log('🔍 API Response:', response);
 
-      if (response && response.data) {
-        const { patients = [], totalItems = 0 } = response.data;
+          if (response && response.data) {
+            const { patients = [], totalItems = 0, total = 0 } = response.data;
+            
+            console.log('🔍 Setting patients:', patients);
+            console.log('🔍 Setting total:', totalItems || total);
+            
+            setPatients(patients || []);
+            setTotalPatients(totalItems || total || 0);
+          } else if (response && Array.isArray(response)) {
+            // Handle direct array response
+            setPatients(response);
+            setTotalPatients(response.length);
+          } else {
+            console.warn('Unexpected response structure:', response);
+            setPatients([]);
+            setTotalPatients(0);
+          }
+        }
+      );
         
-        console.log('🔍 Setting patients:', patients);
-        console.log('🔍 Setting total:', totalItems);
-        
-        setPatients(patients);
-        setTotalPatients(totalItems);
-      } else {
-        console.warn('Unexpected response structure:', response);
-        setPatients([]);
-        setTotalPatients(0);
-      }
-      
     } catch (error) {
       console.error('Error fetching patients:', error);
       setPatients([]);
