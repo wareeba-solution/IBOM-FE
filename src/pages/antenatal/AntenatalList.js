@@ -81,7 +81,6 @@ const AntenatalList = () => {
   // Fetch antenatal records
   const fetchAntenatalRecords = async () => {
     try {
-      // Map frontend filters to API query params
       const queryParams = {
         page: page + 1,
         limit: pageSize,
@@ -91,7 +90,6 @@ const AntenatalList = () => {
 
       // Add search term if provided
       if (searchTerm) {
-        // The API might support a general search parameter
         queryParams.search = searchTerm;
       }
 
@@ -107,15 +105,15 @@ const AntenatalList = () => {
         case 1: // Active
           queryParams.status = 'Active';
           break;
-        case 2: // 1st Trimester
+        case 2: // 1st Trimester (0-12 weeks)
           queryParams.gestationalAgeMin = 0;
           queryParams.gestationalAgeMax = 12;
           break;
-        case 3: // 2nd Trimester
+        case 3: // 2nd Trimester (13-27 weeks)
           queryParams.gestationalAgeMin = 13;
           queryParams.gestationalAgeMax = 27;
           break;
-        case 4: // 3rd Trimester
+        case 4: // 3rd Trimester (28+ weeks)
           queryParams.gestationalAgeMin = 28;
           queryParams.gestationalAgeMax = 42;
           break;
@@ -132,44 +130,18 @@ const AntenatalList = () => {
       await execute(
         antenatalService.getAllAntenatalRecords,
         [queryParams],
-        async (response) => {
+        (response) => {
           console.log('API response:', response);
           
-          // Handle the response structure
+          // Handle the response structure - the data is already properly structured
           const records = response.data || [];
           const pagination = response.pagination || { totalItems: records.length };
 
-          // Map the records and enhance with patient data
-          const mappedRecords = await Promise.all(
-            records.map(async (record) => {
-              const mappedRecord = antenatalService.mapAntenatalRecord(record);
-              
-              // Try to get patient information
-              try {
-                if (mappedRecord.patient_id && patientService) {
-                  const patientData = await patientService.getPatientById(mappedRecord.patient_id);
-                  if (patientData) {
-                    mappedRecord.patient_name = patientData.firstName && patientData.lastName ? 
-                      `${patientData.firstName} ${patientData.lastName}${patientData.otherNames ? ' ' + patientData.otherNames : ''}` :
-                      patientData.name || 'Unknown Patient';
-                    mappedRecord.age = patientData.age || calculateAge(patientData.dateOfBirth);
-                    mappedRecord.date_of_birth = patientData.dateOfBirth;
-                    mappedRecord.phone_number = patientData.phoneNumber;
-                    mappedRecord.address = patientData.address;
-                  }
-                }
-              } catch (patientError) {
-                console.warn('Could not fetch patient data for:', mappedRecord.patient_id, patientError);
-                // Set default values if patient data unavailable
-                mappedRecord.patient_name = `Patient ${mappedRecord.patient_id}`;
-              }
+          console.log('Setting records:', records);
+          console.log('First record structure:', records[0]);
 
-              return mappedRecord;
-            })
-          );
-
-          setAntenatalRecords(mappedRecords);
-          setTotalRecords(pagination.totalItems || mappedRecords.length);
+          setAntenatalRecords(records);
+          setTotalRecords(pagination.totalItems || records.length);
         }
       );
     } catch (error) {
@@ -338,77 +310,153 @@ const AntenatalList = () => {
     }
   };
 
-  // Updated table columns for API data structure
+  // Updated table columns for the actual API response structure
   const columns = [
-    { field: 'registration_number', headerName: 'Reg. No.', width: 140 },
-    { field: 'patient_name', headerName: 'Patient Name', width: 180 },
-    { 
-      field: 'gestational_age', 
-      headerName: 'Gest. Age (Weeks)', 
+    {
+      field: 'registrationNumber',
+      headerName: 'Reg. No.',
       width: 150,
-      valueFormatter: (params) => params.value ? `${params.value} (${getTrimester(params.value)})` : 'N/A'
+      renderCell: (params) => params.row.registrationNumber || 'N/A',
     },
-    { 
-      field: 'edd', 
-      headerName: 'EDD', 
-      width: 120,
-      valueFormatter: (params) => formatDate(params.value)
+    {
+      field: 'patientName',
+      headerName: 'Patient Name',
+      width: 200,
+      renderCell: (params) => {
+        const p = params.row.patient;
+        if (p && (p.firstName || p.lastName)) {
+          return `${p.firstName || ''} ${p.lastName || ''}`.trim();
+        }
+        return 'Unknown';
+      },
     },
-    { 
-      field: 'next_appointment', 
-      headerName: 'Next Visit', 
-      width: 120,
-      valueFormatter: (params) => formatDate(params.value)
+    {
+      field: 'gender',
+      headerName: 'Gender',
+      width: 100,
+      renderCell: (params) => params.row.patient?.gender || 'Unspecified',
     },
-    { 
-      field: 'gravida', 
-      headerName: 'G/P', 
+    {
+      field: 'age',
+      headerName: 'Age',
       width: 80,
-      valueFormatter: (params) => `G${params.row.gravida}P${params.row.para || params.row.parity || 0}`
+      renderCell: (params) => {
+        const dob = params.row.patient?.dateOfBirth;
+        if (!dob) return 'Unknown';
+        const birth = new Date(dob);
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+        return `${age}y`;
+      },
     },
-    { 
-      field: 'risk_level', 
-      headerName: 'Risk Level', 
+    {
+      field: 'gravida',
+      headerName: 'G',
+      width: 60,
+      renderCell: (params) => params.row.gravida ?? '',
+    },
+    {
+      field: 'para',
+      headerName: 'P',
+      width: 60,
+      renderCell: (params) => params.row.para ?? '',
+    },
+    {
+      field: 'lmp',
+      headerName: 'LMP',
+      width: 110,
+      renderCell: (params) =>
+        params.row.lmp ? new Date(params.row.lmp).toLocaleDateString('en-GB') : 'N/A',
+    },
+    {
+      field: 'edd',
+      headerName: 'EDD',
+      width: 110,
+      renderCell: (params) =>
+        params.row.edd ? new Date(params.row.edd).toLocaleDateString('en-GB') : 'N/A',
+    },
+    {
+      field: 'gestationalAge',
+      headerName: 'GA (wks)',
+      width: 100,
+      renderCell: (params) => {
+        if (!params.row.lmp) return 'N/A';
+        const lmp = new Date(params.row.lmp);
+        const today = new Date();
+        const diff = today - lmp;
+        if (isNaN(diff) || diff < 0) return 'Invalid';
+        const weeks = Math.floor(diff / (1000 * 60 * 60 * 24 * 7));
+        return weeks >= 0 && weeks <= 50 ? `${weeks}w` : 'Invalid';
+      },
+    },
+    {
+      field: 'riskLevel',
+      headerName: 'Risk Level',
+      width: 110,
+      renderCell: (params) => params.row.riskLevel || 'Unknown',
+    },
+    {
+      field: 'hivStatus',
+      headerName: 'HIV Status',
+      width: 110,
+      renderCell: (params) => params.row.hivStatus || 'Unknown',
+    },
+    {
+      field: 'phoneNumber',
+      headerName: 'Phone',
       width: 130,
-      renderCell: (params) => (
-        <Chip 
-          label={params.value || 'Unknown'} 
-          color={getRiskLevelColor(params.value)} 
-          size="small" 
-          variant="outlined" 
-        />
-      )
+      renderCell: (params) => params.row.patient?.phoneNumber || 'Not provided',
     },
-    { 
-      field: 'status', 
-      headerName: 'Status', 
-      width: 130,
-      renderCell: (params) => (
-        <Chip 
-          label={params.value || 'Unknown'} 
-          color={getStatusColor(params.value)} 
-          size="small" 
-          variant="outlined" 
-        />
-      )
+    {
+      field: 'facility',
+      headerName: 'Facility',
+      width: 160,
+      renderCell: (params) => params.row.facility?.name || 'Unknown Facility',
     },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 100,
+      renderCell: (params) => params.row.status || 'Unknown',
+    },
+    {
+      field: 'nextAppointment',
+      headerName: 'Next Visit',
+      width: 110,
+      renderCell: (params) =>
+        params.row.nextAppointment
+          ? new Date(params.row.nextAppointment).toLocaleDateString('en-GB')
+          : 'Not scheduled',
+    },
+    // Updated Actions column - removed View, kept Edit and Delete
     {
       field: 'actions',
       headerName: 'Actions',
       width: 150,
       sortable: false,
+      filterable: false,
       renderCell: (params) => (
-        <Box>
-          <Button 
-            size="small" 
-            onClick={(e) => handleEditRecord(params.row.id, e)}
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEditRecord(params.row.id, e);
+            }}
           >
             Edit
           </Button>
-          <Button 
-            size="small" 
-            color="error" 
-            onClick={(e) => handleDeleteClick(params.row, e)}
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteClick(params.row, e);
+            }}
           >
             Delete
           </Button>

@@ -38,80 +38,80 @@ apiClient.interceptors.response.use(
 const FAMILY_PLANNING_BASE_URL = '/api/family-planning';
 
 // API Functions
-export const getAllFamilyPlanningServices = async (params) => {
+export const getAllFamilyPlanningClients = async (params) => {
   try {
-    console.log('Fetching family planning services with params:', params);
+    console.log('Fetching family planning clients with params:', params);
     
-    const response = await apiClient.get(`${FAMILY_PLANNING_BASE_URL}/services`, { params });
-    console.log('Family planning services API response:', response.data);
+    const response = await apiClient.get(`${FAMILY_PLANNING_BASE_URL}/clients`, { params });
+    console.log('Family planning clients API response:', response.data);
     
     return response.data;
   } catch (error) {
-    console.error('Error fetching family planning services:', error);
+    console.error('Error fetching family planning clients:', error);
     throw error;
   }
 };
 
-export const getFamilyPlanningServiceById = async (id) => {
+export const getFamilyPlanningClientById = async (id) => {
   try {
-    console.log('Fetching family planning service by ID:', id);
+    console.log('Fetching family planning client by ID:', id);
     
-    const response = await apiClient.get(`${FAMILY_PLANNING_BASE_URL}/services/${id}`);
-    console.log('Family planning service response:', response.data);
+    const response = await apiClient.get(`${FAMILY_PLANNING_BASE_URL}/clients/${id}`);
+    console.log('Family planning client response:', response.data);
     
     return response.data;
   } catch (error) {
-    console.error('Error fetching family planning service:', error);
+    console.error('Error fetching family planning client:', error);
     throw error;
   }
 };
 
-export const createFamilyPlanningService = async (data) => {
+export const createFamilyPlanningClient = async (data) => {
   try {
-    console.log('Creating family planning service:', data);
+    console.log('Creating family planning client:', data);
     
-    // Validate required fields before sending
-    const requiredFields = ['clientId', 'methodId', 'serviceDate', 'serviceType'];
+    // Validate required fields for client registration
+    const requiredFields = ['patientId', 'facilityId', 'registrationDate', 'clientType', 'maritalStatus'];
     const missingFields = requiredFields.filter(field => !data[field]);
     
     if (missingFields.length > 0) {
       throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
     }
     
-    const response = await apiClient.post(`${FAMILY_PLANNING_BASE_URL}/services`, data);
-    console.log('Create family planning service response:', response.data);
+    const response = await apiClient.post(`${FAMILY_PLANNING_BASE_URL}/clients`, data);
+    console.log('Create family planning client response:', response.data);
     
     return response.data;
   } catch (error) {
-    console.error('Error creating family planning service:', error);
+    console.error('Error creating family planning client:', error);
     throw error;
   }
 };
 
-export const updateFamilyPlanningService = async (id, data) => {
+export const updateFamilyPlanningClient = async (id, data) => {
   try {
-    console.log('Updating family planning service:', id, data);
+    console.log('Updating family planning client:', id, data);
     
-    const response = await apiClient.put(`${FAMILY_PLANNING_BASE_URL}/services/${id}`, data);
-    console.log('Update family planning service response:', response.data);
+    const response = await apiClient.put(`${FAMILY_PLANNING_BASE_URL}/clients/${id}`, data);
+    console.log('Update family planning client response:', response.data);
     
     return response.data;
   } catch (error) {
-    console.error('Error updating family planning service:', error);
+    console.error('Error updating family planning client:', error);
     throw error;
   }
 };
 
-export const deleteFamilyPlanningService = async (id) => {
+export const deleteFamilyPlanningClient = async (id) => {
   try {
-    console.log('Deleting family planning service:', id);
+    console.log('Deleting family planning client:', id);
     
-    const response = await apiClient.delete(`${FAMILY_PLANNING_BASE_URL}/services/${id}`);
-    console.log('Delete family planning service response:', response.data);
+    const response = await apiClient.delete(`${FAMILY_PLANNING_BASE_URL}/clients/${id}`);
+    console.log('Delete family planning client response:', response.data);
     
     return response.data;
   } catch (error) {
-    console.error('Error deleting family planning service:', error);
+    console.error('Error deleting family planning client:', error);
     throw error;
   }
 };
@@ -388,24 +388,108 @@ export const mapToApiFormat = (componentData) => {
   return apiData;
 };
 
+// Helper function to map API client data to component format
+export const mapFamilyPlanningClient = (apiClient) => {
+  if (!apiClient) return null;
+
+  return {
+    id: apiClient.id,
+    patient_id: apiClient.patientId,
+    facility_id: apiClient.facilityId,
+    registration_date: apiClient.registrationDate,
+    client_type: apiClient.clientType,
+    marital_status: apiClient.maritalStatus,
+    number_of_children: apiClient.numberOfChildren,
+    desired_number_of_children: apiClient.desiredNumberOfChildren,
+    education_level: apiClient.educationLevel,
+    occupation: apiClient.occupation,
+    primary_contact: apiClient.primaryContact,
+    medical_history: apiClient.medicalHistory,
+    allergy_history: apiClient.allergyHistory,
+    reproductive_history: apiClient.reproductiveHistory,
+    menstrual_history: apiClient.menstrualHistory,
+    referred_by: apiClient.referredBy,
+    notes: apiClient.notes,
+    status: apiClient.status,
+    created_by: apiClient.createdBy,
+    updated_by: apiClient.updatedBy,
+    created_at: apiClient.createdAt,
+    updated_at: apiClient.updatedAt,
+    deleted_at: apiClient.deletedAt,
+    
+    // Computed fields for display
+    record_id: `FPC${apiClient.id ? apiClient.id.substring(0, 8) : '00000000'}`,
+    patient_name: 'Loading...', // Will be populated from patient API
+    age: null, // Will be calculated from patient data
+    gender: null, // Will be populated from patient data
+    contact_phone: apiClient.primaryContact?.phoneNumber || 'Not provided',
+    contact_name: apiClient.primaryContact?.name || 'Not provided',
+    is_new_acceptor: apiClient.clientType === 'New Acceptor',
+    is_active: apiClient.status === 'Active'
+  };
+};
+
+// Helper function to map component data to API format
+export const mapClientToApiFormat = (componentData) => {
+  const apiData = {
+    patientId: componentData.patient_id,
+    facilityId: componentData.facility_id,
+    registrationDate: componentData.registration_date,
+    clientType: componentData.client_type,
+    maritalStatus: componentData.marital_status,
+    numberOfChildren: componentData.number_of_children ? Number(componentData.number_of_children) : 0,
+    desiredNumberOfChildren: componentData.desired_number_of_children ? Number(componentData.desired_number_of_children) : 0,
+    educationLevel: componentData.education_level,
+    occupation: componentData.occupation,
+    primaryContact: componentData.primary_contact,
+    medicalHistory: componentData.medical_history,
+    allergyHistory: componentData.allergy_history,
+    reproductiveHistory: componentData.reproductive_history,
+    menstrualHistory: componentData.menstrual_history,
+    referredBy: componentData.referred_by,
+    notes: componentData.notes,
+    status: componentData.status || 'Active'
+  };
+
+  // Remove undefined values
+  Object.keys(apiData).forEach(key => 
+    apiData[key] === undefined && delete apiData[key]
+  );
+
+  return apiData;
+};
+
+// Update the default export
 const familyPlanningService = {
-  getAllFamilyPlanningServices,
-  getFamilyPlanningServiceById,
-  createFamilyPlanningService,
-  updateFamilyPlanningService,
-  deleteFamilyPlanningService,
+  // Client management functions
+  getAllFamilyPlanningClients,
+  getFamilyPlanningClientById,
+  createFamilyPlanningClient,
+  updateFamilyPlanningClient,
+  deleteFamilyPlanningClient,
+  
+  // Service management functions (keep the existing ones if you also have services)
+  // getAllFamilyPlanningServices,
+  // getFamilyPlanningServiceById,
+  // createFamilyPlanningService,
+  // updateFamilyPlanningService,
+  // deleteFamilyPlanningService,
+  
+  // Utility functions
   getFamilyPlanningMethods,
   getFamilyPlanningStatistics,
   searchFamilyPlanningClients,
+  mapFamilyPlanningClient,
   mapFamilyPlanningService,
+  mapClientToApiFormat,
   mapToApiFormat,
   
-  // Legacy method names for compatibility
-  getAllRecords: getAllFamilyPlanningServices,
-  getRecordById: getFamilyPlanningServiceById,
-  createRecord: createFamilyPlanningService,
-  updateRecord: updateFamilyPlanningService,
-  deleteRecord: deleteFamilyPlanningService
+  // Legacy aliases
+  getAllRecords: getAllFamilyPlanningClients,
+  getRecordById: getFamilyPlanningClientById,
+  createRecord: createFamilyPlanningClient,
+  updateRecord: updateFamilyPlanningClient,
+  deleteRecord: deleteFamilyPlanningClient
 };
 
 export default familyPlanningService;

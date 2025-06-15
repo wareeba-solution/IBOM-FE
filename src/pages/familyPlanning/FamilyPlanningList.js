@@ -1,5 +1,5 @@
 // src/pages/familyPlanning/FamilyPlanningList.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -60,66 +60,65 @@ const FamilyPlanningList = () => {
   // State
   const [records, setRecords] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterAnchorEl, setFilterAnchorEl] = useState(null);
-  const [filters, setFilters] = useState({
-    methodId: '',
-    serviceType: '',
-    serviceDateFrom: '',
-    serviceDateTo: '',
-    patientSatisfaction: ''
+  const [filterAnchorEl, setFilterAnchorEl] = useState(null);  const [filters, setFilters] = useState({
+    clientType: '',
+    maritalStatus: '',
+    registrationDateFrom: '',
+    registrationDateTo: '',
+    status: ''
   });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [totalRecords, setTotalRecords] = useState(0);
-  const [selectedRecord, setSelectedRecord] = useState(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState('table');
   const [tabValue, setTabValue] = useState(0);
-  const [methods, setMethods] = useState([]);
-
-  // Service types from API
-  const serviceTypes = [
-    'Initial Adoption',
-    'Method Switch',
-    'Resupply',
-    'Follow-up',
-    'Counseling',
-    'Removal',
+  // Client types from API
+  const clientTypes = [
+    'New Acceptor',
+    'Continuing User',
+    'Returner',
     'Other'
   ];
 
-  // Patient satisfaction levels from API
-  const satisfactionLevels = [
-    'Very Satisfied',
-    'Satisfied',
-    'Neutral',
-    'Dissatisfied',
-    'Very Dissatisfied',
-    'Not Recorded'
+  // Marital status options from API
+  const maritalStatuses = [
+    'Single',
+    'Married',
+    'Divorced',
+    'Widowed',
+    'Separated',
+    'Cohabiting'
   ];
 
-  // Fetch family planning methods for filter dropdown
-  useEffect(() => {
-    const loadMethods = async () => {
-      try {
-        const response = await familyPlanningService.getFamilyPlanningMethods();
-        setMethods(response.data || []);
-      } catch (error) {
-        console.error('Failed to load family planning methods:', error);
-      }
-    };
-    
-    loadMethods();
-  }, []);
-
+  // Status options from API
+  const statusOptions = [
+    'Active',
+    'Inactive',
+    'Discontinued',
+    'Transferred',
+    'Other'
+  ];
+  // Family planning methods are not needed for client listing
+  // useEffect(() => {
+  //   const loadMethods = async () => {
+  //     try {
+  //       const response = await familyPlanningService.getFamilyPlanningMethods();
+  //       setMethods(response.data || []);
+  //     } catch (error) {
+  //       console.error('Failed to load family planning methods:', error);
+  //     }
+  //   };
+  //   
+  //   loadMethods();
+  // }, []);
   // Fetch family planning records
-  const fetchRecords = async () => {
-    try {
-      // Map frontend filters to API query params
+  const fetchRecords = useCallback(async () => {
+    try {      // Map frontend filters to API query params
       const queryParams = {
         page: page + 1,
         limit: pageSize,
-        sortBy: 'serviceDate',
+        sortBy: 'registrationDate',
         sortOrder: 'desc'
       };
 
@@ -138,95 +137,76 @@ const FamilyPlanningList = () => {
       // Add tab-specific filters
       switch (tabValue) {
         case 1: // New Acceptors
-          queryParams.serviceType = 'Initial Adoption';
+          queryParams.clientType = 'New Acceptor';
           break;
-        case 2: // Follow-ups
-          queryParams.serviceType = 'Follow-up';
+        case 2: // Active Clients
+          queryParams.status = 'Active';
           break;
         case 3: // This Month
           const now = new Date();
           const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-          queryParams.serviceDateFrom = firstDay.toISOString().split('T')[0];
+          queryParams.registrationDateFrom = firstDay.toISOString().split('T')[0];
           break;
-        case 4: // Side Effects
-          // This would need a specific API parameter or we filter client-side
+        case 4: // Continuing Users
+          queryParams.clientType = 'Continuing User';
           break;
         default:
           // All Records - no additional filters
           break;
-      }
-
-      console.log('Fetching family planning services with params:', queryParams);
+      }console.log('Fetching family planning clients with params:', queryParams);
 
       await execute(
-        familyPlanningService.getAllFamilyPlanningServices,
+        familyPlanningService.getAllFamilyPlanningClients,
         [queryParams],
         async (response) => {
           console.log('API response:', response);
           
           // Handle the response structure
-          const services = response.data || [];
-          const pagination = response.pagination || { total: services.length };
+          const clients = response.data || [];
+          const pagination = response.pagination || { total: clients.length };
 
-          // Map the services and enhance with client/method data
-          const mappedServices = await Promise.all(
-            services.map(async (serviceItem) => {
-              const mappedService = familyPlanningService.mapFamilyPlanningService(serviceItem);
-              
-              // Try to get client information
+          // Map the clients and enhance with patient data
+          const mappedClients = await Promise.all(
+            clients.map(async (clientItem) => {
+              const mappedClient = familyPlanningService.mapFamilyPlanningClient(clientItem);
+                // Try to get client information
               try {
-                if (mappedService.client_id && patientService) {
-                  const clientData = await patientService.getPatientById(mappedService.client_id);
+                if (mappedClient.client_id && patientService) {
+                  const clientData = await patientService.getPatientById(mappedClient.client_id);
                   if (clientData) {
-                    mappedService.patient_name = clientData.firstName && clientData.lastName ? 
+                    mappedClient.patient_name = clientData.firstName && clientData.lastName ? 
                       `${clientData.firstName} ${clientData.lastName}${clientData.otherNames ? ' ' + clientData.otherNames : ''}` :
-                      clientData.name || mappedService.patient_name || 'Unknown Client';
-                    mappedService.age = clientData.age || calculateAge(clientData.dateOfBirth);
-                    mappedService.gender = clientData.gender;
-                    mappedService.marital_status = clientData.maritalStatus;
-                    mappedService.education_level = clientData.educationLevel;
+                      clientData.name || mappedClient.patient_name || 'Unknown Client';
+                    mappedClient.age = clientData.age || calculateAge(clientData.dateOfBirth);
+                    mappedClient.gender = clientData.gender;
+                    mappedClient.marital_status = clientData.maritalStatus;
+                    mappedClient.education_level = clientData.educationLevel;
                   }
                 }
               } catch (clientError) {
-                console.warn('Could not fetch client data for:', mappedService.client_id, clientError);
+                console.warn('Could not fetch client data for:', mappedClient.client_id, clientError);
                 // Use a fallback name
-                if (!mappedService.patient_name || mappedService.patient_name === 'Loading...') {
-                  mappedService.patient_name = `Client ${mappedService.client_id ? mappedService.client_id.substring(0, 8) : 'Unknown'}`;
+                if (!mappedClient.patient_name || mappedClient.patient_name === 'Loading...') {
+                  mappedClient.patient_name = `Client ${mappedClient.client_id ? mappedClient.client_id.substring(0, 8) : 'Unknown'}`;
                 }
-              }
-
-              // Try to get method information
-              try {
-                if (mappedService.method_id && methods.length > 0) {
-                  const method = methods.find(m => m.id === mappedService.method_id);
-                  if (method) {
-                    mappedService.method = method.name;
-                  }
-                }
-              } catch (methodError) {
-                console.warn('Could not map method for:', mappedService.method_id);
-              }
-
-              return mappedService;
+              }              // Client data is now complete
+              return mappedClient;
             })
-          );
-
-          // Filter for side effects tab if needed (client-side filtering)
-          let finalServices = mappedServices;
-          if (tabValue === 4) { // Side Effects tab
-            finalServices = mappedServices.filter(service => service.has_side_effects);
+          );          // Apply client-side filtering if needed
+          let finalClients = mappedClients;
+          if (tabValue === 4) { // Continuing Users tab
+            finalClients = mappedClients.filter(client => client.client_type === 'Continuing User');
           }
 
-          setRecords(finalServices);
-          setTotalRecords(pagination.total || finalServices.length);
+          setRecords(finalClients);
+          setTotalRecords(pagination.total || finalClients.length);
         }
       );
     } catch (error) {
-      console.error('Error fetching family planning services:', error);
-      setRecords([]);
+      console.error('Error fetching family planning clients:', error);      setRecords([]);
       setTotalRecords(0);
     }
-  };
+  }, [page, pageSize, searchTerm, filters, tabValue, execute]);
 
   // Helper function to calculate age from date of birth
   const calculateAge = (dateOfBirth) => {
@@ -244,7 +224,7 @@ const FamilyPlanningList = () => {
   // Initial data loading
   useEffect(() => {
     fetchRecords();
-  }, [page, pageSize, searchTerm, filters, tabValue, methods]);
+  }, [page, pageSize, searchTerm, filters, tabValue, fetchRecords]);
 
   // Handle search
   const handleSearch = (event) => {
@@ -273,14 +253,13 @@ const FamilyPlanningList = () => {
     });
     setPage(0);
   };
-
   const handleClearFilters = () => {
     setFilters({
-      methodId: '',
-      serviceType: '',
-      serviceDateFrom: '',
-      serviceDateTo: '',
-      patientSatisfaction: ''
+      clientType: '',
+      maritalStatus: '',
+      registrationDateFrom: '',
+      registrationDateTo: '',
+      status: ''
     });
     setPage(0);
     setFilterAnchorEl(null);
@@ -363,54 +342,51 @@ const FamilyPlanningList = () => {
         },
       }}
     >
-      <Box sx={{ p: 2 }}>
-        <Typography variant="subtitle1" gutterBottom>
-          Filter Services
+      <Box sx={{ p: 2 }}>        <Typography variant="subtitle1" gutterBottom>
+          Filter Clients
         </Typography>
         
         <FormControl fullWidth margin="dense" size="small">
-          <InputLabel>Method</InputLabel>
+          <InputLabel>Client Type</InputLabel>
           <Select
-            name="methodId"
-            value={filters.methodId}
+            name="clientType"
+            value={filters.clientType}
             onChange={handleFilterChange}
-            label="Method"
+            label="Client Type"
           >
-            <MenuItem value="">All Methods</MenuItem>
-            {methods.map((method) => (
-              <MenuItem key={method.id} value={method.id}>
-                {method.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        
-        <FormControl fullWidth margin="dense" size="small">
-          <InputLabel>Service Type</InputLabel>
-          <Select
-            name="serviceType"
-            value={filters.serviceType}
-            onChange={handleFilterChange}
-            label="Service Type"
-          >
-            <MenuItem value="">All Service Types</MenuItem>
-            {serviceTypes.map((type) => (
+            <MenuItem value="">All Client Types</MenuItem>
+            {clientTypes.map((type) => (
               <MenuItem key={type} value={type}>{type}</MenuItem>
             ))}
           </Select>
         </FormControl>
         
         <FormControl fullWidth margin="dense" size="small">
-          <InputLabel>Patient Satisfaction</InputLabel>
+          <InputLabel>Marital Status</InputLabel>
           <Select
-            name="patientSatisfaction"
-            value={filters.patientSatisfaction}
+            name="maritalStatus"
+            value={filters.maritalStatus}
             onChange={handleFilterChange}
-            label="Patient Satisfaction"
+            label="Marital Status"
           >
-            <MenuItem value="">All</MenuItem>
-            {satisfactionLevels.map((level) => (
-              <MenuItem key={level} value={level}>{level}</MenuItem>
+            <MenuItem value="">All Marital Statuses</MenuItem>
+            {maritalStatuses.map((status) => (
+              <MenuItem key={status} value={status}>{status}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel>Status</InputLabel>
+          <Select
+            name="status"
+            value={filters.status}
+            onChange={handleFilterChange}
+            label="Status"
+          >
+            <MenuItem value="">All Statuses</MenuItem>
+            {statusOptions.map((status) => (
+              <MenuItem key={status} value={status}>{status}</MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -419,10 +395,10 @@ const FamilyPlanningList = () => {
           fullWidth
           margin="dense"
           size="small"
-          label="Service Date From"
-          name="serviceDateFrom"
+          label="Registration Date From"
+          name="registrationDateFrom"
           type="date"
-          value={filters.serviceDateFrom}
+          value={filters.registrationDateFrom}
           onChange={handleFilterChange}
           InputLabelProps={{ shrink: true }}
         />
@@ -431,10 +407,10 @@ const FamilyPlanningList = () => {
           fullWidth
           margin="dense"
           size="small"
-          label="Service Date To"
-          name="serviceDateTo"
+          label="Registration Date To"
+          name="registrationDateTo"
           type="date"
-          value={filters.serviceDateTo}
+          value={filters.registrationDateTo}
           onChange={handleFilterChange}
           InputLabelProps={{ shrink: true }}
         />
@@ -455,7 +431,6 @@ const FamilyPlanningList = () => {
       </Box>
     </Menu>
   );
-
   // Updated table columns for API data structure
   const columns = [
     { field: 'record_id', headerName: 'Record ID', width: 120 },
@@ -476,29 +451,39 @@ const FamilyPlanningList = () => {
     },
     { field: 'age', headerName: 'Age', width: 80, type: 'number' },
     { 
-      field: 'service_date', 
-      headerName: 'Service Date', 
-      width: 120,
+      field: 'registration_date', 
+      headerName: 'Registration Date', 
+      width: 140,
       valueFormatter: (params) => formatDate(params.value)
     },
-    { field: 'method', headerName: 'Method', width: 180 },
-    { field: 'service_type', headerName: 'Service Type', width: 180 },
     { 
-      field: 'is_new_acceptor', 
-      headerName: 'New Acceptor', 
-      width: 130,
+      field: 'client_type', 
+      headerName: 'Client Type', 
+      width: 140,
       renderCell: (params) => (
-        params.value ? 
-          <Chip label="Yes" color="primary" size="small" variant="outlined" /> : 
-          <Chip label="No" size="small" variant="outlined" />
+        <Chip 
+          label={params.value || 'Unknown'} 
+          color={params.value === 'New Acceptor' ? 'primary' : 'default'} 
+          size="small" 
+          variant="outlined" 
+        />
       )
     },
+    { field: 'marital_status', headerName: 'Marital Status', width: 130 },
     { 
-      field: 'next_appointment', 
-      headerName: 'Next Visit', 
-      width: 120,
-      valueFormatter: (params) => formatDate(params.value)
+      field: 'status', 
+      headerName: 'Status', 
+      width: 100,
+      renderCell: (params) => (
+        <Chip 
+          label={params.value || 'Unknown'} 
+          color={params.value === 'Active' ? 'success' : 'default'} 
+          size="small" 
+          variant="outlined" 
+        />
+      )
     },
+    { field: 'contact_phone', headerName: 'Contact', width: 130 },
     {
       field: 'actions',
       headerName: 'Actions',
@@ -552,8 +537,7 @@ const FamilyPlanningList = () => {
                       {record.age}
                     </Typography>
                   </Box>
-                </Box>
-                <Grid container spacing={1}>
+                </Box>                <Grid container spacing={1}>
                   <Grid item xs={6}>
                     <Typography variant="body2" color="text.secondary">
                       <strong>Record ID:</strong> {record.record_id}
@@ -561,22 +545,22 @@ const FamilyPlanningList = () => {
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="body2" color="text.secondary">
-                      <strong>Visit:</strong> {formatDate(record.visit_date)}
+                      <strong>Registered:</strong> {formatDate(record.registration_date)}
                     </Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="body2" color="text.secondary">
-                      <strong>Method:</strong> {record.method}
+                      <strong>Client Type:</strong> {record.client_type}
                     </Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="body2" color="text.secondary">
-                      <strong>Visit Type:</strong> {record.visit_type}
+                      <strong>Marital Status:</strong> {record.marital_status}
                     </Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="body2" color="text.secondary">
-                      <strong>Next Visit:</strong> {formatDate(record.next_visit_date)}
+                      <strong>Contact:</strong> {record.contact_phone}
                     </Typography>
                   </Grid>
                   <Grid item xs={12}>
@@ -589,10 +573,10 @@ const FamilyPlanningList = () => {
                           variant="outlined" 
                         />
                       )}
-                      {record.has_side_effects && (
+                      {record.status === 'Active' && (
                         <Chip 
-                          label="Side Effects" 
-                          color="warning" 
+                          label="Active" 
+                          color="success" 
                           size="small" 
                           variant="outlined" 
                         />
@@ -639,12 +623,11 @@ const FamilyPlanningList = () => {
           onChange={handleTabChange} 
           aria-label="family planning tabs"
           sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
-        >
-          <Tab icon={<PersonIcon />} label="All Records" />
+        >          <Tab icon={<PersonIcon />} label="All Clients" />
           <Tab label="New Acceptors" />
-          <Tab label="Follow-ups" />
+          <Tab label="Active Clients" />
           <Tab label="This Month" />
-          <Tab label="Side Effects" />
+          <Tab label="Continuing Users" />
         </Tabs>
 
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}>
