@@ -6,8 +6,8 @@ const getApiUrl = () => {
   }
 
   // Then check for environment variables
-  if (process.env.REACT_APP_API_BASE_URL) {
-    return process.env.REACT_APP_API_BASE_URL;
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
   }
 
   // Development (localhost)

@@ -57,113 +57,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { format, differenceInWeeks, addDays, parseISO } from 'date-fns';
-
-// Mock antenatal service - replace with actual service when available
-const antenatalService = {
-  getAntenatalRecordById: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const lmpDate = new Date(2023 - (parseInt(id) % 2), (parseInt(id) % 12), parseInt(id) % 28 + 1);
-        const registrationDate = new Date(lmpDate);
-        registrationDate.setDate(registrationDate.getDate() + (parseInt(id) % 30) + 10);
-        
-        const currentDate = new Date();
-        const gestationalAge = differenceInWeeks(currentDate, lmpDate);
-        
-        // Calculate EDD (Estimated Due Date): LMP + 280 days
-        const edd = new Date(lmpDate);
-        edd.setDate(edd.getDate() + 280);
-        
-        const mockAntenatalRecord = {
-          id,
-          registration_number: `ANC${10000 + parseInt(id)}`,
-          patient_name: `${parseInt(id) % 2 === 0 ? 'Mary' : 'Sarah'} ${['Johnson', 'Smith', 'Williams', 'Brown', 'Jones', 'Miller', 'Davis'][parseInt(id) % 7]} ${id}`,
-          patient_id: `PT${5000 + parseInt(id)}`,
-          age: 20 + (parseInt(id) % 15),
-          date_of_birth: new Date(currentDate.getFullYear() - (20 + (parseInt(id) % 15)), (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          lmp: lmpDate.toISOString().split('T')[0],
-          edd: edd.toISOString().split('T')[0],
-          gestational_age: gestationalAge > 0 ? gestationalAge : 4,
-          gravida: 1 + (parseInt(id) % 4),
-          parity: parseInt(id) % 3,
-          phone_number: `080${id}${id}${id}${id}${id}${id}`,
-          address: `Address ${id}, Akwa Ibom`,
-          risk_level: parseInt(id) % 10 === 0 ? 'high' : (parseInt(id) % 5 === 0 ? 'medium' : 'low'),
-          risk_factors: parseInt(id) % 10 === 0 ? ['Previous C-section', 'Hypertension'] : 
-                        (parseInt(id) % 5 === 0 ? ['Advanced maternal age'] : []),
-          registration_date: registrationDate.toISOString().split('T')[0],
-          next_appointment: new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() + (parseInt(id) % 14) + 1).toISOString().split('T')[0],
-          visit_count: parseInt(id) % 8,
-          blood_type: ['A+', 'B+', 'O+', 'AB+', 'A-', 'B-', 'O-', 'AB-'][parseInt(id) % 8],
-          status: parseInt(id) % 20 === 0 ? 'delivered' : (parseInt(id) % 15 === 0 ? 'transferred' : (parseInt(id) % 10 === 0 ? 'inactive' : 'active')),
-          created_at: registrationDate.toISOString(),
-          
-          // Additional fields for detail view
-          height_cm: 150 + (parseInt(id) % 30),
-          weight_kg: 50 + (parseInt(id) % 30),
-          bmi: ((50 + (parseInt(id) % 30)) / Math.pow((150 + (parseInt(id) % 30))/100, 2)).toFixed(1),
-          blood_pressure: `${110 + (parseInt(id) % 30)}/${70 + (parseInt(id) % 20)}`,
-          hiv_status: 'Negative',
-          syphilis_status: 'Negative',
-          hepatitis_b_status: 'Negative',
-          hemoglobin: (10 + (parseInt(id) % 4)).toFixed(1),
-          urinalysis: 'Normal',
-          tetanus_vaccination: parseInt(id) % 3 === 0 ? 'Complete' : 'Incomplete',
-          malaria_prophylaxis: parseInt(id) % 4 === 0 ? 'Not received' : 'Received',
-          iron_folate_supplementation: parseInt(id) % 5 === 0 ? 'Not received' : 'Received',
-          husband_name: `John ${['Johnson', 'Smith', 'Williams', 'Brown', 'Jones', 'Miller', 'Davis'][parseInt(id) % 7]}`,
-          husband_contact: `070${id}${id}${id}${id}${id}${id}`,
-          nearest_health_facility: `Health Center ${parseInt(id) % 5 + 1}`,
-          emergency_contact_name: `${['Alice', 'Jane', 'Emily', 'Susan', 'Margaret'][parseInt(id) % 5]} ${['Johnson', 'Smith', 'Williams', 'Brown', 'Jones'][parseInt(id) % 5]}`,
-          emergency_contact_phone: `090${id}${id}${id}${id}${id}${id}`,
-          emergency_contact_relationship: ['Mother', 'Sister', 'Friend', 'Aunt', 'Mother-in-law'][parseInt(id) % 5],
-          notes: parseInt(id) % 10 === 0 ? 'Patient has a history of hypertension. Monitor BP closely.' : ''
-        };
-        resolve(mockAntenatalRecord);
-      }, 500);
-    });
-  },
-  createAntenatalRecord: async (data) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ 
-          success: true, 
-          id: Math.floor(Math.random() * 1000),
-          ...data
-        });
-      }, 500);
-    });
-  },
-  updateAntenatalRecord: async (id, data) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ 
-          success: true, 
-          id,
-          ...data
-        });
-      }, 500);
-    });
-  },
-  searchPatients: async (searchTerm) => {
-    // Simulate API call to search patients
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Generate mock patients based on search term
-        const mockPatients = Array.from({ length: 5 }, (_, i) => ({
-          id: `PT${5000 + i}`,
-          name: `${searchTerm} ${['Smith', 'Johnson', 'Williams', 'Brown', 'Jones'][i]}`,
-          gender: 'Female',
-          date_of_birth: new Date(2000 - (i % 15), (i % 12), i % 28 + 1).toISOString().split('T')[0],
-        }));
-        resolve(mockPatients);
-      }, 300);
-    });
-  }
-};
+import antenatalService from '../../services/antenatalService';
 
 // Blood type options
 const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -200,68 +94,12 @@ const healthFacilities = [
   'Private Clinic'
 ];
 
-// Form validation schema
-const antenatalValidationSchema = Yup.object({
-  // Patient information
-  patient_id: Yup.string()
-    .required('Patient ID is required'),
-  patient_name: Yup.string()
-    .required('Patient name is required'),
-  date_of_birth: Yup.date()
-    .max(new Date(), 'Date of birth cannot be in the future')
-    .required('Date of birth is required'),
-  age: Yup.number()
-    .min(10, 'Age must be at least 10')
-    .max(60, 'Age must be at most 60')
-    .required('Age is required'),
-  phone_number: Yup.string()
-    .matches(/^[0-9+\s-]{8,15}$/, 'Invalid phone number format')
-    .required('Phone number is required'),
-  address: Yup.string()
-    .required('Address is required'),
-  
-  // Pregnancy information
-  lmp: Yup.date()
-    .max(new Date(), 'Last menstrual period cannot be in the future')
-    .required('Last menstrual period is required'),
-  gravida: Yup.number()
-    .min(1, 'Gravida must be at least 1')
-    .required('Gravida is required'),
-  parity: Yup.number()
-    .min(0, 'Parity must be at least 0')
-    .required('Parity is required'),
-  
-  // Medical information
-  blood_type: Yup.string()
-    .required('Blood type is required'),
-  height_cm: Yup.number()
-    .min(100, 'Height must be at least 100 cm')
-    .max(250, 'Height must be at most 250 cm')
-    .required('Height is required'),
-  weight_kg: Yup.number()
-    .min(30, 'Weight must be at least 30 kg')
-    .max(200, 'Weight must be at most 200 kg')
-    .required('Weight is required'),
-  
-  // Emergency contact
-  husband_name: Yup.string()
-    .nullable(),
-  emergency_contact_name: Yup.string()
-    .required('Emergency contact name is required'),
-  emergency_contact_phone: Yup.string()
-    .matches(/^[0-9+\s-]{8,15}$/, 'Invalid phone number format')
-    .required('Emergency contact phone is required'),
-  emergency_contact_relationship: Yup.string()
-    .required('Relationship is required'),
-  
-  // Other fields
-  status: Yup.string()
-    .required('Status is required')
-});
+// Initial values
+// (Removed duplicate declaration of initialAntenatalValues)
 
 // Initial values
 const initialAntenatalValues = {
-  // Patient information
+  // Patient information (these will be populated from API response)
   patient_id: '',
   patient_name: '',
   date_of_birth: null,
@@ -310,6 +148,8 @@ const initialAntenatalValues = {
   notes: ''
 };
 
+// (Removed duplicate AntenatalForm component definition and its inner code. The correct AntenatalForm component is defined below and should be kept.)
+
 // Antenatal Form Component
 const AntenatalForm = () => {
   const { id } = useParams();
@@ -332,66 +172,176 @@ const AntenatalForm = () => {
   // Steps for the form
   const steps = ['Patient Information', 'Pregnancy Details', 'Medical Information', 'Emergency Contacts'];
 
-  // Handle form submission
-  const handleSubmit = async (values) => {
-    try {
-      // Format date values
-      const formattedValues = {
-        ...values,
-        date_of_birth: values.date_of_birth ? format(new Date(values.date_of_birth), 'yyyy-MM-dd') : null,
-        lmp: format(new Date(values.lmp), 'yyyy-MM-dd'),
-        edd: values.edd ? format(new Date(values.edd), 'yyyy-MM-dd') : null,
-        registration_date: format(new Date(values.registration_date), 'yyyy-MM-dd'),
-        next_appointment: format(new Date(values.next_appointment), 'yyyy-MM-dd')
-      };
-
-      if (isEditMode) {
-        // Update existing antenatal record
-        await execute(
-          antenatalService.updateAntenatalRecord,
-          [id, formattedValues],
-          (response) => {
-            setAlertMessage('Antenatal record updated successfully');
-            setAlertSeverity('success');
-            setAlertOpen(true);
-            
-            // Navigate back to antenatal detail after a short delay
-            setTimeout(() => {
-              navigate(`/antenatal/${id}`);
-            }, 1500);
-          }
-        );
-      } else {
-        // Create new antenatal record
-        await execute(
-          antenatalService.createAntenatalRecord,
-          [formattedValues],
-          (response) => {
-            setAlertMessage('Antenatal record registered successfully');
-            setAlertSeverity('success');
-            setAlertOpen(true);
-            
-            // Navigate to the new record's detail page
-            setTimeout(() => {
-              navigate(`/antenatal/${response.id}`);
-            }, 1500);
-          }
-        );
-      }
-    } catch (err) {
-      setAlertMessage('Failed to save antenatal record information');
-      setAlertSeverity('error');
-      setAlertOpen(true);
-    }
-  };
-
-  // Initialize formik
-  const formik = useFormik({
-    initialValues: initialAntenatalValues,
-    validationSchema: antenatalValidationSchema,
-    onSubmit: handleSubmit,
-    enableReinitialize: true
+  // Form validation schema (moved inside component to access isEditMode)
+  const antenatalValidationSchema = Yup.object().shape({
+    // Patient information - conditionally required based on edit mode
+    patient_id: Yup.string().when([], {
+      is: () => !isEditMode,
+      then: (schema) => schema.required('Patient ID is required'),
+      otherwise: (schema) => schema.notRequired()
+    }),
+    
+    patient_name: Yup.string().when([], {
+      is: () => !isEditMode,
+      then: (schema) => schema.required('Patient name is required'),
+      otherwise: (schema) => schema.notRequired()
+    }),
+    
+    date_of_birth: Yup.date()
+      .max(new Date(), 'Date of birth cannot be in the future')
+      .when([], {
+        is: () => !isEditMode,
+        then: (schema) => schema.required('Date of birth is required'),
+        otherwise: (schema) => schema.notRequired()
+      }),
+    
+    age: Yup.number()
+      .min(10, 'Age must be at least 10')
+      .max(60, 'Age must be at most 60')
+      .when([], {
+        is: () => !isEditMode,
+        then: (schema) => schema.required('Age is required'),
+        otherwise: (schema) => schema.notRequired()
+      }),
+    
+    phone_number: Yup.string()
+      .matches(/^[0-9+\s-]{8,15}$/, 'Invalid phone number format')
+      .when([], {
+        is: () => !isEditMode,
+        then: (schema) => schema.required('Phone number is required'),
+        otherwise: (schema) => schema.notRequired()
+      }),
+    
+    address: Yup.string().when([], {
+      is: () => !isEditMode,
+      then: (schema) => schema.required('Address is required'),
+      otherwise: (schema) => schema.notRequired()
+    }),
+    
+    blood_type: Yup.string().when([], {
+      is: () => !isEditMode,
+      then: (schema) => schema.required('Blood type is required'),
+      otherwise: (schema) => schema.notRequired()
+    }),
+    
+    // Pregnancy information - always required
+    lmp: Yup.date()
+      .max(new Date(), 'Last menstrual period cannot be in the future')
+      .required('Last menstrual period is required'),
+    
+    gravida: Yup.number()
+      .min(1, 'Gravida must be at least 1')
+      .required('Gravida is required'),
+    
+    parity: Yup.number()
+      .min(0, 'Parity must be at least 0')
+      .required('Parity is required'),
+    
+  // Medical information - always required
+  height_cm: Yup.number()
+    .min(100, 'Height must be at least 100 cm')
+    .max(250, 'Height must be at most 250 cm')
+    .required('Height is required'),
+  
+  weight_kg: Yup.number()
+      .min(30, 'Weight must be at least 30 kg')
+      .max(200, 'Weight must be at most 200 kg')
+      .required('Weight is required'),
+    // (add any additional validation fields here if needed)
   });
+  
+    // Handle form submission
+    const handleSubmit = async (values) => {
+      try {
+        // Convert form values to API structure
+        const apiData = {
+          // Patient information
+          patientId: values.patient_id,
+          address: values.address,
+          phoneNumber: values.phone_number,
+          // Partner information (husband)
+          partner: {
+            name: values.husband_name,
+            phone: values.husband_contact
+          },
+          // Emergency contact
+          emergencyContact: {
+            name: values.emergency_contact_name,
+            phone: values.emergency_contact_phone,
+            relationship: values.emergency_contact_relationship
+          },
+          // Pregnancy information
+          lmp: values.lmp,
+          edd: values.edd,
+          gravida: values.gravida,
+          para: values.parity,
+          riskLevel: values.risk_level,
+          riskFactors: values.risk_factors,
+          // Medical information
+          bloodGroup: values.blood_type,
+          height: values.height_cm,
+          prePregnancyWeight: values.weight_kg,
+          bmi: values.bmi,
+          bloodPressure: values.blood_pressure,
+          hivStatus: values.hiv_status,
+          vdrl: values.syphilis_status,
+          hepatitisB: values.hepatitis_b_status,
+          hemoglobin: values.hemoglobin,
+          urinalysis: values.urinalysis,
+          // Preventive measures
+          tetanusVaccination: values.tetanus_vaccination,
+          malariaProphylaxis: values.malaria_prophylaxis,
+          ironFolateSupplementation: values.iron_folate_supplementation,
+          // Additional information
+          registrationDate: values.registration_date,
+          nextAppointment: values.next_appointment,
+          status: (() => {
+            switch (values.status?.toLowerCase()) {
+              case 'active':
+                return 'Active';
+              case 'inactive':
+                return 'Lost to Follow-up';
+              case 'delivered':
+                return 'Completed';
+              case 'transferred':
+                return 'Transferred';
+              default:
+                return 'Active'; // Default fallback
+            }
+          })(),
+          notes: values.notes
+        };
+
+        let response;
+        if (isEditMode) {
+          response = await antenatalService.updateAntenatalRecord(id, apiData);
+          setAlertMessage('Antenatal record updated successfully.');
+        } else {
+          response = await antenatalService.createAntenatalRecord(apiData);
+          setAlertMessage('Antenatal record created successfully.');
+        }
+        setAlertSeverity('success');
+        setAlertOpen(true);
+        //resetForm();
+        setTimeout(() => {
+          navigate('/antenatal');
+        }, 1500);
+      } catch (error) {
+        setAlertMessage('Failed to save antenatal record.');
+        setAlertSeverity('error');
+        setAlertOpen(true);
+      } finally {
+        //setSubmitting(false);
+      }
+    };
+
+    // Initialize formik
+    const formik = useFormik({
+      initialValues: initialAntenatalValues,
+      validationSchema: antenatalValidationSchema,
+      onSubmit: handleSubmit,
+      enableReinitialize: true
+    });
 
   // Calculate BMI when weight or height changes
   useEffect(() => {
@@ -466,22 +416,83 @@ const AntenatalForm = () => {
           antenatalService.getAntenatalRecordById,
           [id],
           (response) => {
-            // Transform API response to form values format
-            const antenatalData = {
-              ...initialAntenatalValues,
-              ...response,
-              date_of_birth: response.date_of_birth ? new Date(response.date_of_birth) : null,
+            console.log('API Response for editing:', response);
+            
+            // Convert API response to form values format
+            const patient = response.patient || {};
+            const partner = response.partner || {};
+            const emergencyContact = response.emergencyContact || {};
+            
+            const formValues = {
+              // Patient information - convert from API structure
+              patient_id: response.patientId || '',
+              patient_name: `${patient.firstName || ''} ${patient.lastName || ''}`.trim(),
+              date_of_birth: patient.dateOfBirth ? new Date(patient.dateOfBirth) : null,
+              age: patient.dateOfBirth ? (() => {
+                const dob = new Date(patient.dateOfBirth);
+                const today = new Date();
+                let age = today.getFullYear() - dob.getFullYear();
+                const m = today.getMonth() - dob.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+                  age--;
+                }
+                return age;
+              })() : '',
+              phone_number: patient.phoneNumber || '',
+              address: response.address || '',
+              
+              // Pregnancy information - direct from API
               lmp: response.lmp ? new Date(response.lmp) : new Date(),
               edd: response.edd ? new Date(response.edd) : null,
-              registration_date: response.registration_date ? new Date(response.registration_date) : new Date(),
-              next_appointment: response.next_appointment ? new Date(response.next_appointment) : addDays(new Date(), 14)
+              gestational_age: response.lmp ? (() => {
+                const lmpDate = new Date(response.lmp);
+                const today = new Date();
+                return Math.floor((today - lmpDate) / (1000 * 60 * 60 * 24 * 7));
+              })() : '',
+              gravida: response.gravida || 1,
+              parity: response.para || 0,
+              risk_level: response.riskLevel || 'low',
+              risk_factors: response.riskFactors || [],
+              
+              // Medical information - convert from API structure
+              blood_type: response.bloodGroup || '',
+              height_cm: response.height || '',
+              weight_kg: response.prePregnancyWeight || '',
+              bmi: response.height && response.prePregnancyWeight ? 
+                ((response.prePregnancyWeight / Math.pow(response.height/100, 2)).toFixed(1)) : '',
+              blood_pressure: '',
+              hiv_status: response.hivStatus === 'Not Tested' ? 'Unknown' : (response.hivStatus || 'Unknown'),
+              syphilis_status: response.vdrl === 'Not Tested' ? 'Unknown' : (response.vdrl || 'Unknown'),
+              hepatitis_b_status: response.hepatitisB === 'Not Tested' ? 'Unknown' : (response.hepatitisB || 'Unknown'),
+              hemoglobin: '',
+              urinalysis: 'Normal',
+              
+              // Preventive measures - direct from API
+              tetanus_vaccination: response.tetanusVaccination || 'Incomplete',
+              malaria_prophylaxis: response.malariaProphylaxis || 'Not received',
+              iron_folate_supplementation: response.ironFolateSupplementation || 'Not received',
+              
+              // Contact information - convert from API structure
+              husband_name: partner.name || '',
+              husband_contact: partner.phone || '',
+              nearest_health_facility: response.nearestHealthFacility || '',
+              emergency_contact_name: emergencyContact.name || '',
+              emergency_contact_phone: emergencyContact.phone || '',
+              emergency_contact_relationship: emergencyContact.relationship || '',
+              
+              // Additional information
+              registration_date: response.registrationDate ? new Date(response.registrationDate) : new Date(),
+              next_appointment: response.nextAppointment ? new Date(response.nextAppointment) : addDays(new Date(), 14),
+              status: response.status === 'Active' ? 'active' : (response.status || 'active').toLowerCase(),
+              notes: response.medicalHistory || ''
             };
             
-            setAntenatalRecord(antenatalData);
+            console.log('Converted form values:', formValues);
+            setAntenatalRecord(formValues);
             
             // Set formik values
-            Object.keys(antenatalData).forEach(key => {
-              formik.setFieldValue(key, antenatalData[key], false);
+            Object.keys(formValues).forEach(key => {
+              formik.setFieldValue(key, formValues[key], false);
             });
           }
         );
@@ -615,29 +626,36 @@ const AntenatalForm = () => {
               <Typography variant="subtitle1" gutterBottom>
                 Patient Information
               </Typography>
+              {isEditMode && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Patient details are read-only in edit mode. Only antenatal-related information can be modified.
+                </Alert>
+              )}
             </Grid>
             
-            <Grid item xs={12}>
-              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<SearchIcon />}
-                  onClick={() => setPatientSearchOpen(true)}
-                >
-                  Search Patient
-                </Button>
-                {formik.values.patient_id && (
+            {!isEditMode && (
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
                   <Button
                     variant="outlined"
-                    component="a"
-                    href={`/patients/${formik.values.patient_id}`}
-                    target="_blank"
+                    startIcon={<SearchIcon />}
+                    onClick={() => setPatientSearchOpen(true)}
                   >
-                    View Patient Profile
+                    Search Patient
                   </Button>
-                )}
-              </Box>
-            </Grid>
+                  {formik.values.patient_id && (
+                    <Button
+                      variant="outlined"
+                      component="a"
+                      href={`/patients/${formik.values.patient_id}`}
+                      target="_blank"
+                    >
+                      View Patient Profile
+                    </Button>
+                  )}
+                </Box>
+              </Grid>
+            )}
             
             <Grid item xs={12} sm={6}>
               <TextField
@@ -650,7 +668,10 @@ const AntenatalForm = () => {
                 onBlur={formik.handleBlur}
                 error={formik.touched.patient_id && Boolean(formik.errors.patient_id)}
                 helperText={formik.touched.patient_id && formik.errors.patient_id}
-                disabled={isEditMode}
+                disabled={isEditMode} // Always disabled in edit mode
+                InputProps={{
+                  readOnly: isEditMode,
+                }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -664,6 +685,10 @@ const AntenatalForm = () => {
                 onBlur={formik.handleBlur}
                 error={formik.touched.patient_name && Boolean(formik.errors.patient_name)}
                 helperText={formik.touched.patient_name && formik.errors.patient_name}
+                disabled={isEditMode} // Disabled in edit mode
+                InputProps={{
+                  readOnly: isEditMode,
+                }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -672,6 +697,7 @@ const AntenatalForm = () => {
                   label="Date of Birth *"
                   value={formik.values.date_of_birth}
                   onChange={handleDateOfBirthChange}
+                  disabled={isEditMode} // Disabled in edit mode
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -681,6 +707,8 @@ const AntenatalForm = () => {
                       error={formik.touched.date_of_birth && Boolean(formik.errors.date_of_birth)}
                       helperText={formik.touched.date_of_birth && formik.errors.date_of_birth}
                       InputProps={{
+                        ...params.InputProps,
+                        readOnly: isEditMode,
                         endAdornment: (
                           <InputAdornment position="end">
                             <DateRangeIcon color="action" />
@@ -708,9 +736,10 @@ const AntenatalForm = () => {
                   (formik.values.date_of_birth ? 'Calculated from date of birth' : '')
                 }
                 InputProps={{
-                  readOnly: Boolean(formik.values.date_of_birth),
+                  readOnly: Boolean(formik.values.date_of_birth) || isEditMode,
                   inputProps: { min: 10, max: 60 }
                 }}
+                disabled={isEditMode} // Disabled in edit mode
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -724,10 +753,14 @@ const AntenatalForm = () => {
                 onBlur={formik.handleBlur}
                 error={formik.touched.phone_number && Boolean(formik.errors.phone_number)}
                 helperText={formik.touched.phone_number && formik.errors.phone_number}
+                disabled={isEditMode} // Disabled in edit mode
+                InputProps={{
+                  readOnly: isEditMode,
+                }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth disabled={isEditMode}>
                 <InputLabel id="blood-type-label">Blood Type *</InputLabel>
                 <Select
                   labelId="blood-type-label"
@@ -738,6 +771,7 @@ const AntenatalForm = () => {
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                   error={formik.touched.blood_type && Boolean(formik.errors.blood_type)}
+                  readOnly={isEditMode} // Read-only in edit mode
                 >
                   <MenuItem value=""><em>Select Blood Type</em></MenuItem>
                   {bloodTypes.map((type) => (
@@ -762,12 +796,16 @@ const AntenatalForm = () => {
                 helperText={formik.touched.address && formik.errors.address}
                 multiline
                 rows={2}
+                disabled={isEditMode} // Disabled in edit mode
+                InputProps={{
+                  readOnly: isEditMode,
+                }}
               />
             </Grid>
           </Grid>
         );
       
-      case 1: // Pregnancy Details
+      case 1: // Pregnancy Details - Keep all fields editable
         return (
           <Grid container spacing={2}>
             <Grid item xs={12}>
@@ -965,7 +1003,7 @@ const AntenatalForm = () => {
           </Grid>
         );
       
-      case 2: // Medical Information
+      case 2: // Medical Information - Keep all fields editable
         return (
           <Grid container spacing={2}>
             <Grid item xs={12}>
@@ -1195,7 +1233,7 @@ const AntenatalForm = () => {
           </Grid>
         );
       
-      case 3: // Emergency Contacts
+      case 3: // Emergency Contacts - Keep all fields editable
         return (
           <Grid container spacing={2}>
             <Grid item xs={12}>
@@ -1357,6 +1395,11 @@ const AntenatalForm = () => {
   // Check if a specific step is complete
   const isStepComplete = (step) => {
     if (step === 0) {
+      // In edit mode, patient info is always complete since it's read-only
+      if (isEditMode) {
+        return true;
+      }
+      // For new records, check all required fields
       return (
         formik.values.patient_id &&
         formik.values.patient_name &&
@@ -1400,16 +1443,29 @@ const AntenatalForm = () => {
 
   // Determine if the form can be submitted
   const canSubmit = () => {
-    return (
-      formik.values.patient_id &&
-      formik.values.patient_name &&
-      formik.values.lmp &&
-      formik.values.height_cm &&
-      formik.values.weight_kg &&
-      formik.values.emergency_contact_name &&
-      formik.values.emergency_contact_phone &&
-      Object.keys(formik.errors).length === 0
-    );
+    if (isEditMode) {
+      // In edit mode, only check antenatal-related required fields
+      return (
+        formik.values.lmp &&
+        formik.values.height_cm &&
+        formik.values.weight_kg &&
+        formik.values.emergency_contact_name &&
+        formik.values.emergency_contact_phone &&
+        Object.keys(formik.errors).length === 0
+      );
+    } else {
+      // For new records, check all required fields including patient info
+      return (
+        formik.values.patient_id &&
+        formik.values.patient_name &&
+        formik.values.lmp &&
+        formik.values.height_cm &&
+        formik.values.weight_kg &&
+        formik.values.emergency_contact_name &&
+        formik.values.emergency_contact_phone &&
+        Object.keys(formik.errors).length === 0
+      );
+    }
   };
 
   return (
