@@ -115,79 +115,70 @@ const ImmunizationList = () => {
 
       // Handle API response structure
       if (response && response.data) {
-        // Check if this is actually patient data instead of immunization data
-        const responseData = response.data.immunizations || response.data || [];
+        // Extract immunization data from nested structure
+        const responseData = response.data.data || response.data || [];
         console.log('Response data:', responseData);
         
-        // If we're getting patient data instead of immunization data, map it properly
+        // Map the actual immunization data correctly
         const mappedImmunizations = responseData.map((item, index) => {
-          console.log('Processing item:', item);
+          console.log('Processing immunization item:', item);
           
-          // Check if this looks like patient data (has firstName, lastName, etc.)
-          if (item.firstName && item.lastName) {
-            // This is patient data, create mock immunization record
-            return {
-              id: item.id || `mock-${index}`,
-              registration_number: item.uniqueIdentifier || `IM-${new Date().getFullYear()}-${String(index + 1).padStart(4, '0')}`,
-              patient_name: `${item.firstName} ${item.lastName}${item.otherNames ? ' ' + item.otherNames : ''}`,
-              patient_id: item.uniqueIdentifier || item.id,
-              gender: item.gender || 'Unknown',
-              date_of_birth: item.dateOfBirth,
-              age_months: calculateAgeMonths(item.dateOfBirth),
-              vaccine_type: 'COVID-19', // Mock data since we don't have actual immunization data
-              vaccine_name: 'Pfizer-BioNTech',
-              dose_number: 1,
-              lot_number: `LOT-${Math.floor(Math.random() * 10000)}`,
-              vaccination_date: item.registrationDate || item.createdAt,
-              next_due_date: null,
-              healthcare_provider: 'Dr. Default Provider',
-              facility: item.registrationFacility?.name || 'Unknown Facility',
-              facility_id: item.facilityId,
-              administration_site: 'Left Arm',
-              administration_route: 'Intramuscular',
-              dosage: '0.5 mL',
-              weight_kg: null,
-              height_cm: null,
-              status: 'administered',
-              side_effects: null,
-              notes: null,
-              created_at: item.createdAt
-            };
-          } else {
-            // This is actual immunization data
-            return {
-              id: item.id,
-              registration_number: item.registration_number || `IM-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
-              patient_name: item.patient_name || item.patientName || 'Unknown Patient',
-              patient_id: item.patientId || 'Unknown',
-              gender: item.gender || 'Unknown',
-              date_of_birth: item.date_of_birth || item.dateOfBirth,
-              age_months: item.ageMonths || item.age_months,
-              vaccine_type: item.vaccineType || item.vaccine_type,
-              vaccine_name: item.vaccineName || item.vaccine_name,
-              dose_number: item.doseNumber || item.dose_number || 1,
-              lot_number: item.batchNumber || item.lot_number,
-              vaccination_date: item.administrationDate || item.vaccination_date,
-              next_due_date: item.nextDoseDate || item.next_due_date,
-              healthcare_provider: item.administeredBy || item.healthcare_provider,
-              facility: item.facility_name || item.facilityName || 'Unknown Facility',
-              facility_id: item.facilityId || item.facility_id,
-              administration_site: item.administrationSite || item.administration_site,
-              administration_route: item.administrationRoute || item.administration_route,
-              dosage: item.dosage,
-              weight_kg: item.weightKg || item.weight_kg,
-              height_cm: item.heightCm || item.height_cm,
-              status: item.status?.toLowerCase() || 'administered',
-              side_effects: item.sideEffects || item.side_effects,
-              notes: item.notes,
-              created_at: item.createdAt || item.created_at
-            };
-          }
+          // Extract patient and facility data from nested objects
+          const patient = item.patient || {};
+          const facility = item.facility || {};
+          
+          return {
+            id: item.id,
+            registration_number: `IM-${new Date().getFullYear()}-${String(index + 1).padStart(4, '0')}`,
+            
+            // Patient information from nested patient object
+            patient_name: patient.firstName && patient.lastName ? 
+              `${patient.firstName} ${patient.lastName}` : 
+              'Unknown Patient',
+            patient_id: item.patientId,
+            gender: patient.gender || 'Unknown',
+            date_of_birth: patient.dateOfBirth,
+            age_months: item.ageMonths || calculateAgeMonths(patient.dateOfBirth),
+            
+            // Vaccine information (directly from item)
+            vaccine_type: item.vaccineType,
+            vaccine_name: item.vaccineName,
+            dose_number: item.doseNumber,
+            lot_number: item.batchNumber,
+            vaccination_date: item.administrationDate,
+            next_due_date: item.nextDoseDate,
+            
+            // Administration details
+            healthcare_provider: item.administeredBy,
+            administration_site: item.administrationSite,
+            administration_route: item.administrationRoute,
+            dosage: item.dosage,
+            
+            // Facility information from nested facility object
+            facility: facility.name || 'Unknown Facility',
+            facility_id: item.facilityId,
+            
+            // Medical measurements
+            weight_kg: item.weightKg,
+            height_cm: item.heightCm,
+            
+            // Status and effects
+            status: item.status?.toLowerCase() || 'administered',
+            side_effects: item.sideEffects,
+            notes: item.notes,
+            
+            // Additional fields
+            expiry_date: item.expiryDate,
+            provider_id: item.providerId,
+            created_at: item.createdAt,
+            updated_at: item.updatedAt
+          };
         });
 
         console.log('Mapped immunizations:', mappedImmunizations);
         setImmunizations(mappedImmunizations);
         
+        // Handle pagination
         const pagination = response.data.pagination || { totalItems: mappedImmunizations.length };
         setTotalImmunizations(pagination.totalItems || mappedImmunizations.length);
       } else {
@@ -202,24 +193,24 @@ const ImmunizationList = () => {
     }
   };
 
-  // Calculate immunization counts for tabs
+  // Update the calculateImmunizationCounts function
   const calculateImmunizationCounts = (immunizationsData) => {
     const counts = {
       total: immunizationsData.length,
-      administered: immunizationsData.filter(imm => imm.status === 'administered').length,
-      scheduled: immunizationsData.filter(imm => imm.status === 'scheduled').length,
-      missed: immunizationsData.filter(imm => imm.status === 'missed').length,
-      cancelled: immunizationsData.filter(imm => imm.status === 'cancelled').length,
+      administered: immunizationsData.filter(imm => imm.status?.toLowerCase() === 'administered').length,
+      scheduled: immunizationsData.filter(imm => imm.status?.toLowerCase() === 'scheduled').length,
+      missed: immunizationsData.filter(imm => imm.status?.toLowerCase() === 'missed').length,
+      cancelled: immunizationsData.filter(imm => imm.status?.toLowerCase() === 'cancelled').length,
     };
     setImmunizationCounts(counts);
   };
 
-  // Fetch immunization counts for tabs
+  // Update the fetchImmunizationCounts function
   const fetchImmunizationCounts = async () => {
     try {
       const response = await immunizationService.getAllImmunizations({ limit: 100 });
       if (response && response.data) {
-        const immunizationsData = response.data.immunizations || response.data || [];
+        const immunizationsData = response.data.data || response.data || [];
         calculateImmunizationCounts(immunizationsData);
       }
     } catch (error) {

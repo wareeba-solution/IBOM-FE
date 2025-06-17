@@ -50,12 +50,13 @@ import {
   ContentPaste as ContentPasteIcon,
   Assignment as AssignmentIcon,
   Warning as WarningIcon,
+  Phone as PhoneIcon,
+  ContactPhone as ContactPhoneIcon,
 } from '@mui/icons-material';
 import { format, parseISO } from 'date-fns';
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
 import familyPlanningService from '../../services/familyPlanningService';
-import patientService from '../../services/patientService'; // If available
 
 // Family Planning Detail Component
 const FamilyPlanningDetail = () => {
@@ -72,49 +73,72 @@ const FamilyPlanningDetail = () => {
   useEffect(() => {
     const loadRecord = async () => {
       await execute(
-        familyPlanningService.getFamilyPlanningServiceById,
+        familyPlanningService.getFamilyPlanningClientById,
         [id],
         async (response) => {
-          console.log('Loaded family planning service:', response);
           
           // Map API response to component format
-          const apiData = response.data || response;
-          const mappedRecord = familyPlanningService.mapFamilyPlanningService(apiData);
+          const clientData = response.data || response;
+          const patient = clientData.patient || {};
+          const facility = clientData.facility || {};
+          const primaryContact = clientData.primaryContact || {};
           
-          // Try to get client information
-          try {
-            if (mappedRecord.client_id && patientService) {
-              const clientData = await patientService.getPatientById(mappedRecord.client_id);
-              if (clientData) {
-                mappedRecord.patient_name = clientData.firstName && clientData.lastName ? 
-                  `${clientData.firstName} ${clientData.lastName}${clientData.otherNames ? ' ' + clientData.otherNames : ''}` :
-                  clientData.name || mappedRecord.patient_name || 'Unknown Client';
-                mappedRecord.age = clientData.age || calculateAge(clientData.dateOfBirth);
-                mappedRecord.gender = clientData.gender;
-                mappedRecord.marital_status = clientData.maritalStatus;
-                mappedRecord.education_level = clientData.educationLevel;
-                mappedRecord.parity = clientData.parity;
-              }
-            }
-          } catch (clientError) {
-            console.warn('Could not fetch client data:', clientError);
-            // Use fallback name
-            if (!mappedRecord.patient_name || mappedRecord.patient_name === 'Loading...') {
-              mappedRecord.patient_name = `Client ${mappedRecord.client_id ? mappedRecord.client_id.substring(0, 8) : 'Unknown'}`;
-            }
-          }
-          
-          // Try to get method information
-          try {
-            const methodsResponse = await familyPlanningService.getFamilyPlanningMethods();
-            const methods = methodsResponse.data || [];
-            const method = methods.find(m => m.id === mappedRecord.method_id);
-            if (method) {
-              mappedRecord.method = method.name;
-            }
-          } catch (methodError) {
-            console.warn('Could not fetch method data:', methodError);
-          }
+          const mappedRecord = {
+            id: clientData.id,
+            record_id: `FPC${clientData.id ? clientData.id.substring(0, 8) : '00000000'}`,
+            patient_id: clientData.patientId,
+            facility_id: clientData.facilityId,
+            
+            // Patient information from nested patient object
+            patient_name: patient.firstName && patient.lastName ? 
+              `${patient.firstName} ${patient.lastName}` : 
+              'Unknown Client',
+            gender: patient.gender,
+            date_of_birth: patient.dateOfBirth,
+            age: patient.dateOfBirth ? calculateAge(patient.dateOfBirth) : null,
+            phone_number: patient.phoneNumber,
+            
+            // Client information
+            registration_date: clientData.registrationDate,
+            client_type: clientData.clientType,
+            marital_status: clientData.maritalStatus,
+            number_of_children: clientData.numberOfChildren,
+            desired_number_of_children: clientData.desiredNumberOfChildren,
+            education_level: clientData.educationLevel,
+            occupation: clientData.occupation,
+            
+            // Contact information
+            primary_contact: primaryContact,
+            contact_name: primaryContact.name || 'Not provided',
+            contact_phone: primaryContact.phoneNumber || 'Not provided',
+            contact_relationship: primaryContact.relationship || 'Not provided',
+            contact_address: primaryContact.address || 'Not provided',
+            
+            // Medical information
+            medical_history: clientData.medicalHistory,
+            allergy_history: clientData.allergyHistory,
+            reproductive_history: clientData.reproductiveHistory,
+            menstrual_history: clientData.menstrualHistory,
+            
+            // Service information
+            referred_by: clientData.referredBy,
+            notes: clientData.notes,
+            status: clientData.status,
+            
+            // Facility information
+            facility_name: facility.name,
+            facility_type: facility.facilityType,
+            facility_lga: facility.lga,
+            
+            // Computed fields
+            is_new_acceptor: clientData.clientType === 'New Acceptor',
+            is_active: clientData.status === 'Active',
+            has_allergies: !!clientData.allergyHistory,
+            
+            // Timestamps
+            created_at: clientData.createdAt,
+            updated_at: clientData.updatedAt,
+          };
           
           setRecord(mappedRecord);
         }
@@ -140,7 +164,7 @@ const FamilyPlanningDetail = () => {
   // Handle delete - Updated for real API
   const handleDeleteConfirm = async () => {
     await execute(
-      familyPlanningService.deleteFamilyPlanningService,
+      familyPlanningService.deleteFamilyPlanningClient,
       [id],
       () => {
         navigate('/family-planning');
@@ -186,7 +210,7 @@ const FamilyPlanningDetail = () => {
 
   if (loading && !record) {
     return (
-      <MainLayout title="Family Planning Record">
+      <MainLayout title="Family Planning Client">
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
           <CircularProgress />
         </Box>
@@ -196,7 +220,7 @@ const FamilyPlanningDetail = () => {
 
   if (error && !record) {
     return (
-      <MainLayout title="Family Planning Record">
+      <MainLayout title="Family Planning Client">
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
@@ -206,7 +230,7 @@ const FamilyPlanningDetail = () => {
           variant="contained"
           startIcon={<ArrowBackIcon />}
         >
-          Back to Records
+          Back to Clients
         </Button>
       </MainLayout>
     );
@@ -214,9 +238,9 @@ const FamilyPlanningDetail = () => {
 
   if (!record) {
     return (
-      <MainLayout title="Family Planning Record">
+      <MainLayout title="Family Planning Client">
         <Alert severity="info" sx={{ mb: 2 }}>
-          Loading family planning record...
+          Loading family planning client...
         </Alert>
       </MainLayout>
     );
@@ -224,7 +248,7 @@ const FamilyPlanningDetail = () => {
 
   return (
     <MainLayout 
-      title={`Family Planning Record: ${record.record_id}`}
+      title={`Family Planning Client: ${record.record_id}`}
       breadcrumbs={[
         { name: 'Family Planning', path: '/family-planning' },
         { name: record.record_id, active: true }
@@ -242,7 +266,7 @@ const FamilyPlanningDetail = () => {
               <ArrowBackIcon />
             </IconButton>
             <Typography variant="h5" component="h1">
-              Family Planning Record
+              Family Planning Client
             </Typography>
           </Box>
           <Box>
@@ -274,7 +298,7 @@ const FamilyPlanningDetail = () => {
                 <ListItemIcon>
                   <EditIcon fontSize="small" />
                 </ListItemIcon>
-                <ListItemText primary="Edit Record" />
+                <ListItemText primary="Edit Client" />
               </MenuItem>
               <MenuItem onClick={() => { handleMenuClose(); /* Add print functionality */ }}>
                 <ListItemIcon>
@@ -312,13 +336,13 @@ const FamilyPlanningDetail = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <PersonIcon sx={{ mr: 1 }} />
                   {record.patient_name}
-                  {record.gender === 'Female' ? 
+                  {record.gender === 'female' ? 
                     <FemaleIcon color="secondary" sx={{ ml: 1 }} /> : 
                     <MaleIcon color="primary" sx={{ ml: 1 }} />
                   }
                 </Box>
               }
-              subheader={`Record ID: ${record.record_id} | Patient ID: ${record.patient_id}`}
+              subheader={`Client ID: ${record.record_id} | Patient ID: ${record.patient_id}`}
               action={
                 <Box sx={{ display: 'flex', gap: 1 }}>
                   {record.is_new_acceptor && (
@@ -329,9 +353,17 @@ const FamilyPlanningDetail = () => {
                       variant="outlined" 
                     />
                   )}
-                  {record.has_side_effects && (
+                  {record.is_active && (
                     <Chip 
-                      label="Side Effects" 
+                      label="Active" 
+                      color="success" 
+                      size="medium" 
+                      variant="outlined" 
+                    />
+                  )}
+                  {record.has_allergies && (
+                    <Chip 
+                      label="Has Allergies" 
                       color="warning" 
                       size="medium" 
                       variant="outlined" 
@@ -345,34 +377,34 @@ const FamilyPlanningDetail = () => {
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6} md={3}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Visit Date
+                    Registration Date
                   </Typography>
                   <Typography variant="body1" gutterBottom>
-                    {formatDate(record.visit_date)}
+                    {formatDate(record.registration_date)}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Next Visit
+                    Client Type
                   </Typography>
                   <Typography variant="body1" gutterBottom>
-                    {formatDate(record.next_visit_date)}
+                    {record.client_type}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Visit Type
+                    Status
                   </Typography>
                   <Typography variant="body1" gutterBottom>
-                    {record.visit_type}
+                    {record.status}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Method
+                    Facility
                   </Typography>
                   <Typography variant="body1" gutterBottom>
-                    {record.method}
+                    {record.facility_name}
                   </Typography>
                 </Grid>
               </Grid>
@@ -387,7 +419,7 @@ const FamilyPlanningDetail = () => {
                 title={
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <PersonIcon sx={{ mr: 1 }} />
-                    Client Information
+                    Patient Information
                   </Box>
                 }
               />
@@ -414,6 +446,25 @@ const FamilyPlanningDetail = () => {
                       </TableRow>
                       <TableRow>
                         <TableCell component="th" scope="row">
+                          Date of Birth
+                        </TableCell>
+                        <TableCell>
+                          {formatDate(record.date_of_birth)}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">
+                          Phone Number
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <PhoneIcon fontSize="small" sx={{ mr: 1 }} />
+                            {record.phone_number || 'Not provided'}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">
                           Marital Status
                         </TableCell>
                         <TableCell>
@@ -428,22 +479,12 @@ const FamilyPlanningDetail = () => {
                           {record.education_level || 'Not recorded'}
                         </TableCell>
                       </TableRow>
-                      {record.gender === 'female' && (
-                        <TableRow>
-                          <TableCell component="th" scope="row">
-                            Parity
-                          </TableCell>
-                          <TableCell>
-                            {record.parity || 'Not recorded'}
-                          </TableCell>
-                        </TableRow>
-                      )}
                       <TableRow>
                         <TableCell component="th" scope="row">
-                          Patient Satisfaction
+                          Occupation
                         </TableCell>
                         <TableCell>
-                          {record.patient_satisfaction || 'Not Recorded'}
+                          {record.occupation || 'Not recorded'}
                         </TableCell>
                       </TableRow>
                     </TableBody>
@@ -459,7 +500,7 @@ const FamilyPlanningDetail = () => {
                 title={
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <MedicalIcon sx={{ mr: 1 }} />
-                    Service Information
+                    Family Planning Information
                   </Box>
                 }
               />
@@ -470,75 +511,169 @@ const FamilyPlanningDetail = () => {
                     <TableBody>
                       <TableRow>
                         <TableCell component="th" scope="row" width="40%">
-                          Method
+                          Client Type
                         </TableCell>
                         <TableCell>
-                          {record.method || 'Not specified'}
+                          {record.client_type || 'Not specified'}
                         </TableCell>
                       </TableRow>
                       <TableRow>
                         <TableCell component="th" scope="row">
-                          Service Type
+                          Number of Children
                         </TableCell>
                         <TableCell>
-                          {record.service_type}
+                          {record.number_of_children || 0}
                         </TableCell>
                       </TableRow>
-                      {record.quantity && (
-                        <TableRow>
-                          <TableCell component="th" scope="row">
-                            Quantity Provided
-                          </TableCell>
-                          <TableCell>
-                            {record.quantity}
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      {record.batch_number && (
-                        <TableRow>
-                          <TableCell component="th" scope="row">
-                            Batch Number
-                          </TableCell>
-                          <TableCell>
-                            {record.batch_number}
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      {record.expiry_date && (
-                        <TableRow>
-                          <TableCell component="th" scope="row">
-                            Expiry Date
-                          </TableCell>
-                          <TableCell>
-                            {formatDate(record.expiry_date)}
-                          </TableCell>
-                        </TableRow>
-                      )}
                       <TableRow>
                         <TableCell component="th" scope="row">
-                          Provider
+                          Desired Children
                         </TableCell>
                         <TableCell>
-                          {record.provider || record.provided_by || 'Not recorded'}
+                          {record.desired_number_of_children || 'Not specified'}
                         </TableCell>
                       </TableRow>
-                      {record.weight && (
+                      <TableRow>
+                        <TableCell component="th" scope="row">
+                          Referred By
+                        </TableCell>
+                        <TableCell>
+                          {record.referred_by || 'Self-referred'}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">
+                          Facility
+                        </TableCell>
+                        <TableCell>
+                          {record.facility_name} ({record.facility_lga})
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">
+                          Status
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={record.status} 
+                            color={record.is_active ? 'success' : 'default'} 
+                            size="small" 
+                          />
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: '100%' }}>
+              <CardHeader
+                title={
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <ContactPhoneIcon sx={{ mr: 1 }} />
+                    Emergency Contact
+                  </Box>
+                }
+              />
+              <Divider />
+              <CardContent>
+                <TableContainer>
+                  <Table size="small">
+                    <TableBody>
+                      <TableRow>
+                        <TableCell component="th" scope="row" width="40%">
+                          Name
+                        </TableCell>
+                        <TableCell>
+                          {record.contact_name}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">
+                          Relationship
+                        </TableCell>
+                        <TableCell>
+                          {record.contact_relationship}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">
+                          Phone Number
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <PhoneIcon fontSize="small" sx={{ mr: 1 }} />
+                            {record.contact_phone}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">
+                          Address
+                        </TableCell>
+                        <TableCell>
+                          {record.contact_address}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: '100%' }}>
+              <CardHeader
+                title={
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <MedicalIcon sx={{ mr: 1 }} />
+                    Medical History
+                  </Box>
+                }
+              />
+              <Divider />
+              <CardContent>
+                <TableContainer>
+                  <Table size="small">
+                    <TableBody>
+                      <TableRow>
+                        <TableCell component="th" scope="row" width="40%">
+                          Medical History
+                        </TableCell>
+                        <TableCell>
+                          {record.medical_history || 'No significant medical history'}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">
+                          Reproductive History
+                        </TableCell>
+                        <TableCell>
+                          {record.reproductive_history || 'Not recorded'}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell component="th" scope="row">
+                          Menstrual History
+                        </TableCell>
+                        <TableCell>
+                          {record.menstrual_history || 'Not recorded'}
+                        </TableCell>
+                      </TableRow>
+                      {record.allergy_history && (
                         <TableRow>
                           <TableCell component="th" scope="row">
-                            Weight
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <WarningIcon fontSize="small" color="warning" sx={{ mr: 1 }} />
+                              Allergies
+                            </Box>
                           </TableCell>
                           <TableCell>
-                            {record.weight} kg
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      {record.blood_pressure && (
-                        <TableRow>
-                          <TableCell component="th" scope="row">
-                            Blood Pressure
-                          </TableCell>
-                          <TableCell>
-                            {record.blood_pressure}
+                            {record.allergy_history}
                           </TableCell>
                         </TableRow>
                       )}
@@ -549,139 +684,21 @@ const FamilyPlanningDetail = () => {
             </Card>
           </Grid>
 
-          {record.reason_for_visit && (
+          {record.notes && (
             <Grid item xs={12}>
               <Card>
                 <CardHeader
                   title={
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <HelpOutlineIcon sx={{ mr: 1 }} />
-                      Reason for Visit
-                    </Box>
-                  }
-                />
-                <Divider />
-                <CardContent>
-                  <Typography variant="body1">
-                    {record.reason_for_visit}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
-
-          {record.counseling_provided && record.counseling_notes && (
-            <Grid item xs={12} md={6}>
-              <Card sx={{ height: '100%' }}>
-                <CardHeader
-                  title={
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <ContentPasteIcon sx={{ mr: 1 }} />
-                      Counseling Notes
+                      Additional Notes
                     </Box>
                   }
                 />
                 <Divider />
                 <CardContent>
                   <Typography variant="body1">
-                    {record.counseling_notes}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
-
-          {record.follow_up_plan && (
-            <Grid item xs={12} md={6}>
-              <Card sx={{ height: '100%' }}>
-                <CardHeader
-                  title={
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <CalendarIcon sx={{ mr: 1 }} />
-                      Follow-up Plan
-                    </Box>
-                  }
-                />
-                <Divider />
-                <CardContent>
-                  <Typography variant="body1">
-                    {record.follow_up_plan}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
-
-          {record.side_effects_reported && record.side_effects_reported.length > 0 && (
-            <Grid item xs={12}>
-              <Card sx={{ borderColor: '#ff9800', borderWidth: 1, borderStyle: 'solid' }}>
-                <CardHeader
-                  title={
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <WarningIcon sx={{ mr: 1, color: '#ff9800' }} />
-                      Side Effects Reported
-                    </Box>
-                  }
-                  sx={{ bgcolor: '#fff8e1' }}
-                />
-                <Divider />
-                <CardContent>
-                  <Typography variant="body1">
-                    {Array.isArray(record.side_effects_reported) ? 
-                      record.side_effects_reported.join(', ') : 
-                      record.side_effects_reported}
-                  </Typography>
-                  {record.side_effects_management && (
-                    <>
-                      <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-                        Management:
-                      </Typography>
-                      <Typography variant="body1">
-                        {record.side_effects_management}
-                      </Typography>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
-
-          {record.counseling_notes && (
-            <Grid item xs={12} md={6}>
-              <Card sx={{ height: '100%' }}>
-                <CardHeader
-                  title={
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <ContentPasteIcon sx={{ mr: 1 }} />
-                      Counseling Notes
-                    </Box>
-                  }
-                />
-                <Divider />
-                <CardContent>
-                  <Typography variant="body1">
-                    {record.counseling_notes}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
-
-          {record.procedure_notes && (
-            <Grid item xs={12} md={6}>
-              <Card sx={{ height: '100%' }}>
-                <CardHeader
-                  title={
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <AssignmentIcon sx={{ mr: 1 }} />
-                      Procedure Notes
-                    </Box>
-                  }
-                />
-                <Divider />
-                <CardContent>
-                  <Typography variant="body1">
-                    {record.procedure_notes}
+                    {record.notes}
                   </Typography>
                 </CardContent>
               </Card>
@@ -699,7 +716,7 @@ const FamilyPlanningDetail = () => {
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete this family planning record? This action cannot be undone and will remove all associated data.
+            Are you sure you want to delete this family planning client record? This action cannot be undone and will remove all associated data.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

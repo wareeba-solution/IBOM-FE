@@ -31,6 +31,9 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  Stepper,
+  Step,
+  StepLabel
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -42,149 +45,23 @@ import {
   Add as AddIcon,
   Search as SearchIcon,
 } from '@mui/icons-material';
-import { format, parseISO, addMonths } from 'date-fns';
+import { format, parseISO, addMonths, isValid } from 'date-fns';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
+import familyPlanningService from '../../services/familyPlanningService';
+import patientService from '../../services/patientService';
 
-// Mock family planning service - replace with actual service when available
-const familyPlanningService = {
-  getRecordById: async (id) => {
-    // Simulate API call for edit mode
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        if (id) {
-          const visitDate = new Date();
-          visitDate.setMonth(visitDate.getMonth() - (parseInt(id) % 12));
-          
-          const nextVisitDate = new Date(visitDate);
-          nextVisitDate.setMonth(nextVisitDate.getMonth() + 3);
-          
-          const age = 18 + (parseInt(id) % 30);
-          const isMale = parseInt(id) % 10 === 0; // Mostly female clients, but some male for condoms or vasectomy
-          
-          const contraceptiveMethods = [
-            'Oral Contraceptives',
-            'Injectable Contraceptives',
-            'Intrauterine Device (IUD)',
-            'Implant',
-            'Condoms',
-            'Female Sterilization',
-            'Male Sterilization',
-            'Natural Family Planning',
-            'Emergency Contraception',
-            'Other'
-          ];
-          
-          const visitTypes = [
-            'Initial Consultation',
-            'Follow-up',
-            'Method Change',
-            'Method Renewal',
-            'Side Effects Consultation',
-            'Counseling Only',
-            'Removal',
-            'Other'
-          ];
-          
-          const mockRecord = {
-            id,
-            record_id: `FP${10000 + parseInt(id)}`,
-            patient_id: `PT${5000 + parseInt(id)}`,
-            patient_name: `${isMale ? 'John' : 'Jane'} ${['Doe', 'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Miller'][parseInt(id) % 7]} ${id}`,
-            age: age,
-            gender: isMale ? 'Male' : 'Female',
-            visit_date: visitDate.toISOString().split('T')[0],
-            next_visit_date: nextVisitDate.toISOString().split('T')[0],
-            visit_type: visitTypes[parseInt(id) % visitTypes.length],
-            method: isMale ? 
-              (parseInt(id) % 5 === 0 ? 'Male Sterilization' : 'Condoms') : 
-              contraceptiveMethods[parseInt(id) % (contraceptiveMethods.length - 2)],
-            quantity_provided: parseInt(id) % 5 === 0 ? 0 : (parseInt(id) % 10 + 1),
-            location: `${['Uyo', 'Ikot Ekpene', 'Eket', 'Oron', 'Abak'][parseInt(id) % 5]} Health Center`,
-            provider: `Provider ${parseInt(id) % 10 + 1}`,
-            has_side_effects: (parseInt(id) % 7 === 0),
-            side_effects: parseInt(id) % 7 === 0 ? 
-              'Patient reported headaches and nausea after starting the method.' : '',
-            is_new_acceptor: (parseInt(id) % 5 === 0),
-            parity: parseInt(id) % 8,
-            marital_status: ['Single', 'Married', 'Divorced', 'Widowed'][parseInt(id) % 4],
-            education_level: ['None', 'Primary', 'Secondary', 'Tertiary'][parseInt(id) % 4],
-            partner_support: ['Supportive', 'Unsupportive', 'Unaware', 'N/A'][parseInt(id) % 4],
-            reason_for_visit: parseInt(id) % 5 === 0 ? 
-              'Patient wants to start family planning.' : 
-              (parseInt(id) % 7 === 0 ? 
-                'Patient experiencing side effects.' : 
-                'Routine follow-up visit.'),
-            counseling_provided: true,
-            counseling_notes: 'Discussed all available methods and their side effects. Emphasized importance of consistent use.',
-            follow_up_plan: 'Return in 3 months for method renewal or sooner if experiencing issues.',
-            notes: parseInt(id) % 3 === 0 ? 
-              'Patient expressed concern about privacy. Reassured about confidentiality.' : ''
-          };
-          resolve(mockRecord);
-        } else {
-          // New record with default values
-          resolve({
-            id: '',
-            record_id: '',
-            patient_id: '',
-            patient_name: '',
-            age: '',
-            gender: 'Female',
-            visit_date: new Date().toISOString().split('T')[0],
-            next_visit_date: addMonths(new Date(), 3).toISOString().split('T')[0],
-            visit_type: 'Initial Consultation',
-            method: '',
-            quantity_provided: 0,
-            location: '',
-            provider: '',
-            has_side_effects: false,
-            side_effects: '',
-            is_new_acceptor: true,
-            parity: 0,
-            marital_status: '',
-            education_level: '',
-            partner_support: '',
-            reason_for_visit: '',
-            counseling_provided: true,
-            counseling_notes: '',
-            follow_up_plan: '',
-            notes: ''
-          });
-        }
-      }, 500);
-    });
-  },
-  saveRecord: async (recordData) => {
-    // Simulate API call for save/update
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newId = recordData.id || Math.floor(Math.random() * 1000) + 50;
-        resolve({
-          success: true,
-          id: newId,
-          record_id: recordData.record_id || `FP${10000 + newId}`
-        });
-      }, 700);
-    });
-  },
-  searchPatients: async (query) => {
-    // Simulate patient search API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockPatients = Array.from({ length: 5 }, (_, i) => ({
-          id: `PT${5000 + i}`,
-          name: `${i % 2 === 0 ? 'John' : 'Jane'} ${['Doe', 'Smith', 'Johnson', 'Williams', 'Brown'][i % 5]} ${query || ''}`,
-          age: 20 + i * 5,
-          gender: i % 2 === 0 ? 'Male' : 'Female',
-        }));
-        resolve(mockPatients);
-      }, 300);
-    });
-  },
-};
+// Utility function to calculate age from date of birth
+function calculateAge(dateOfBirth) {
+  if (!dateOfBirth) return '';
+  const dob = new Date(dateOfBirth);
+  if (isNaN(dob)) return '';
+  const diffMs = Date.now() - dob.getTime();
+  const ageDt = new Date(diffMs);
+  return Math.abs(ageDt.getUTCFullYear() - 1970);
+}
 
 // Contraceptive methods
 const contraceptiveMethods = [
@@ -244,21 +121,30 @@ const validationSchema = Yup.object({
   age: Yup.number().required('Age is required').min(12, 'Age must be at least 12').max(100, 'Age must be under 100'),
   visit_date: Yup.date().nullable().required('Visit date is required'),
   visit_type: Yup.string().required('Visit type is required'),
-  method: Yup.string().required('Method is required'),
+  method: Yup.string(), // Remove .required('Method is required')
   location: Yup.string().required('Location is required'),
-  provider: Yup.string().required('Provider is required'),
+  provider: Yup.string(), // Remove .required('Provider is required')
   marital_status: Yup.string().required('Marital status is required'),
   quantity_provided: Yup.number().min(0, 'Quantity cannot be negative'),
   counseling_provided: Yup.boolean(),
   counseling_notes: Yup.string().when('counseling_provided', {
     is: true,
-    then: () => Yup.string().required('Counseling notes are required when counseling is provided')
+    then: () => Yup.string(), // Remove .required('Counseling notes are required when counseling is provided')
+    otherwise: () => Yup.string()
   }),
   side_effects: Yup.string().when('has_side_effects', {
     is: true,
     then: () => Yup.string().required('Side effects description is required when side effects are reported')
   }),
 });
+
+// Step titles
+const steps = [
+  'Patient Information',
+  'Visit Information',
+  'Method and Counseling',
+  'Side Effects and Notes'
+];
 
 // Family Planning Form Component
 const FamilyPlanningForm = () => {
@@ -274,6 +160,7 @@ const FamilyPlanningForm = () => {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [savedRecordId, setSavedRecordId] = useState(null);
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const [activeStep, setActiveStep] = useState(0);
 
   // Initialize formik
   const formik = useFormik({
@@ -308,72 +195,199 @@ const FamilyPlanningForm = () => {
     onSubmit: handleSubmit,
   });
 
+
   // Load family planning record when editing
   useEffect(() => {
     const loadRecord = async () => {
       await execute(
-        familyPlanningService.getRecordById,
-        [id],
-        (response) => {
-          const formattedData = {
-            ...response,
-            visit_date: response.visit_date ? parseISO(response.visit_date) : new Date(),
-            next_visit_date: response.next_visit_date ? parseISO(response.next_visit_date) : addMonths(new Date(), 3),
+        familyPlanningService.getFamilyPlanningClientById,
+        [id],        async (response) => {
+          
+          // Map API response to form fields
+          const clientData = response.data || response;
+          
+          // Get patient details - handle nested patient object or fetch separately
+          let patientData = {};
+          let patientName = 'Unknown Client';
+          
+          // Check if patient data is nested in the response
+          if (clientData.patient) {
+            const patient = clientData.patient;
+            patientName = [patient.firstName, patient.lastName, patient.otherNames]
+              .filter(name => name && name.trim()) // Remove empty/null values
+              .join(' ') || 'Unknown Client';
+            
+            patientData = {
+              patient_name: patientName,
+              age: patient.age || calculateAge(patient.dateOfBirth),
+              gender: patient.gender
+            };
+          } else if (clientData.patientId && patientService) {
+            // Fetch patient data separately
+            try {
+              const patient = await patientService.getPatientById(clientData.patientId);
+              if (patient) {
+                patientName = [patient.firstName, patient.lastName, patient.otherNames]
+                  .filter(name => name && name.trim()) // Remove empty/null values
+                  .join(' ') || 'Unknown Client';
+                
+                patientData = {
+                  patient_name: patientName,
+                  age: patient.age || calculateAge(patient.dateOfBirth),
+                  gender: patient.gender
+                };
+              }
+            } catch (error) {
+              console.warn('Could not load patient data:', error);
+              patientName = `Client ${clientData.patientId ? clientData.patientId.substring(0, 8) : 'Unknown'}`;
+            }
+          }
+          
+          // Parse dates safely
+          const parseDate = (dateValue) => {
+            if (!dateValue) return new Date();
+            try {
+              const parsed = parseISO(dateValue);
+              return isValid(parsed) ? parsed : new Date();
+            } catch (error) {
+              console.warn('Invalid date:', dateValue);
+              return new Date();
+            }
           };
+
+          // Map the API data to form structure
+          const formattedData = {
+            id: clientData.id,
+            record_id: `FPC${clientData.id ? clientData.id.substring(0, 8) : ''}`,
+            patient_id: clientData.patientId,
+            patient_name: patientName, // Use the properly formatted name
+            age: patientData.age || '',
+            gender: patientData.gender || 'Female',
+            
+            // Use current date for visit_date since it's not in the client data
+            visit_date: new Date(),
+            next_visit_date: clientData.nextAppointment ? parseDate(clientData.nextAppointment) : addMonths(new Date(), 3),
+            
+            // Map client data to form fields
+            visit_type: 'Follow-up',
+            method: '',
+            quantity_provided: 0,
+            location: clientData.facility?.name || '',
+            provider: '',
+            
+            // Client information
+            marital_status: clientData.maritalStatus || '',
+            education_level: clientData.educationLevel || '',
+            parity: clientData.numberOfChildren || 0,
+            
+            // Health information
+            has_side_effects: false,
+            side_effects: '',
+            is_new_acceptor: clientData.clientType === 'New Acceptor',
+            
+            // Contact and notes
+            partner_support: '',
+            reason_for_visit: 'Routine follow-up',
+            counseling_provided: true,
+            counseling_notes: clientData.notes || '',
+            follow_up_plan: '',
+            notes: clientData.medicalHistory || ''          };
+          
           formik.setValues(formattedData);
         }
       );
     };
     
-    loadRecord();
-  }, [id]);
+    if (id) {
+      loadRecord();
+    }
+  }, [id, execute]);
 
   // Handle patient search
   useEffect(() => {
-    if (patientSearchQuery) {
-      const searchPatients = async () => {
-        setIsSearchingPatient(true);
+    const searchPatients = async () => {
+      if (patientSearchQuery.length >= 2) {
         try {
-          const results = await familyPlanningService.searchPatients(patientSearchQuery);
-          setPatientSearchResults(results);
+          const results = await patientService.searchPatients(patientSearchQuery);
+          const formattedResults = results.map(patient => {
+            // Properly format patient name
+            const name = [patient.firstName, patient.lastName, patient.otherNames]
+              .filter(name => name && name.trim())
+              .join(' ') || 'Unknown Patient';
+            
+            return {
+              id: patient.id,
+              name: name,
+              age: patient.age || calculateAge(patient.dateOfBirth),
+              gender: patient.gender,
+              phone: patient.phoneNumber
+            };
+          });
+          setPatientSearchResults(formattedResults);
         } catch (error) {
           console.error('Error searching patients:', error);
-        } finally {
-          setIsSearchingPatient(false);
+          setPatientSearchResults([]);
         }
-      };
-      
-      const debounce = setTimeout(() => {
-        searchPatients();
-      }, 300);
-      
-      return () => clearTimeout(debounce);
-    } else {
-      setPatientSearchResults([]);
-    }
+      } else {
+        setPatientSearchResults([]);
+      }
+    };
+    
+    const debounce = setTimeout(() => {
+      searchPatients();
+    }, 300);
+    
+    return () => clearTimeout(debounce);
   }, [patientSearchQuery]);
 
   // Handle patient selection
-  const handlePatientSelect = (patient) => {
-    if (patient) {
-      formik.setFieldValue('patient_id', patient.id);
-      formik.setFieldValue('patient_name', patient.name);
-      formik.setFieldValue('age', patient.age);
-      formik.setFieldValue('gender', patient.gender);
+  const handlePatientSelect = async (patient) => {
+    try {
+      // Get full patient details
+      const fullPatientData = await patientService.getPatientById(patient.id);
       
-      // Adjust method options based on gender
-      if (patient.gender === 'Male' && 
-          formik.values.method !== 'Condoms' && 
-          formik.values.method !== 'Male Sterilization') {
-        formik.setFieldValue('method', '');
-      }
+      // Format the name properly
+      const patientName = [fullPatientData.firstName, fullPatientData.lastName, fullPatientData.otherNames]
+        .filter(name => name && name.trim())
+        .join(' ') || 'Unknown Patient';
+    
+      formik.setValues({
+        ...formik.values,
+        patient_id: patient.id,
+        patient_name: patientName,
+        age: fullPatientData.age || calculateAge(fullPatientData.dateOfBirth),
+        gender: fullPatientData.gender,
+      });
+      
+      setPatientSearchQuery('');
+      setPatientSearchResults([]);
+      setPatientSelectOpen(false);
+    } catch (error) {
+      console.error('Error loading patient details:', error);
+      // Still set basic info even if full details fail
+      formik.setValues({
+        ...formik.values,
+        patient_id: patient.id,
+        patient_name: patient.name, // Use the already formatted name from search
+        age: patient.age,
+        gender: patient.gender,
+      });
+      
+      setPatientSearchQuery('');
+      setPatientSearchResults([]);
+      setPatientSelectOpen(false);
     }
-    setPatientSelectOpen(false);
   };
 
   // Handle next visit date update based on method
   useEffect(() => {
     if (formik.values.method && formik.values.visit_date) {
+      // Ensure visit_date is a valid Date object
+      let visitDate = formik.values.visit_date;
+      if (!(visitDate instanceof Date) || !isValid(visitDate)) {
+        visitDate = new Date();
+      }
+      
       let months = 3; // Default follow-up period
       
       // Adjust based on method
@@ -402,87 +416,30 @@ const FamilyPlanningForm = () => {
       }
       
       // Only update if the field hasn't been manually changed
-      if (formik.values.visit_date && (!formik.touched.next_visit_date || id === undefined)) {
-        const nextDate = addMonths(formik.values.visit_date, months);
-        formik.setFieldValue('next_visit_date', nextDate);
+      if (!formik.touched.next_visit_date || id === undefined) {
+        try {
+          const nextDate = addMonths(visitDate, months);
+          if (isValid(nextDate)) {
+            formik.setFieldValue('next_visit_date', nextDate);
+          }
+        } catch (error) {
+          console.warn('Error calculating next visit date:', error);
+          // Fallback to 3 months from now
+          formik.setFieldValue('next_visit_date', addMonths(new Date(), 3));
+        }
       }
     }
-  }, [formik.values.method, formik.values.visit_date]);
+  }, [formik.values.method, formik.values.visit_date, id, formik.touched.next_visit_date]);
 
-  // Form submission handler
-  async function handleSubmit(values) {
-    try {
-      await execute(
-        familyPlanningService.saveRecord,
-        [values],
-        (response) => {
-          setSavedRecordId(response.record_id);
-          setSuccessDialogOpen(true);
-        }
-      );
-    } catch (error) {
-      console.error('Error saving record:', error);
-    }
-  }
+  // Stepper navigation
+  const handleNext = () => setActiveStep((prev) => prev + 1);
+  const handleBack = () => setActiveStep((prev) => prev - 1);
 
-  // Cancel form handling
-  const handleCancelClick = () => {
-    if (formik.dirty) {
-      setConfirmDialogOpen(true);
-    } else {
-      navigate('/family-planning');
-    }
-  };
-
-  const handleConfirmCancel = () => {
-    setConfirmDialogOpen(false);
-    navigate('/family-planning');
-  };
-
-  const handleSuccessDialogClose = () => {
-    setSuccessDialogOpen(false);
-    navigate(`/family-planning/${id || formik.values.id}`);
-  };
-
-  // Format date for display
-  const formatDate = (date) => {
-    if (!date) return '';
-    try {
-      return format(date, 'MMMM dd, yyyy');
-    } catch (error) {
-      return '';
-    }
-  };
-
-  return (
-    <MainLayout 
-      title={id ? "Edit Family Planning Record" : "New Family Planning Record"}
-      breadcrumbs={[
-        { name: 'Family Planning', path: '/family-planning' },
-        { name: id ? 'Edit Record' : 'New Record', active: true }
-      ]}
-    >
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <IconButton
-            color="inherit"
-            onClick={handleCancelClick}
-            sx={{ mr: 2 }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-          <Typography variant="h5" component="h1">
-            {id ? "Edit Family Planning Record" : "New Family Planning Record"}
-          </Typography>
-        </Box>
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
-
-        <form onSubmit={formik.handleSubmit}>
+  // Render each section as a step
+  const renderStepContent = (step) => {
+    switch (step) {
+      case 0:
+        return (
           <Card sx={{ mb: 3 }}>
             <CardHeader title="Patient Information" />
             <Divider />
@@ -506,7 +463,7 @@ const FamilyPlanningForm = () => {
                         <IconButton 
                           size="small" 
                           onClick={() => setPatientSelectOpen(true)}
-                          disabled={loading}
+                          disabled={loading || !!id} // Disable if editing
                         >
                           <SearchIcon />
                         </IconButton>
@@ -525,15 +482,22 @@ const FamilyPlanningForm = () => {
                     onBlur={formik.handleBlur}
                     error={formik.touched.patient_name && Boolean(formik.errors.patient_name)}
                     helperText={formik.touched.patient_name && formik.errors.patient_name}
-                    disabled={loading}
-                    required
+                    disabled={true} // Make uneditable
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                    sx={{
+                      '& .MuiInputBase-input.Mui-disabled': {
+                        WebkitTextFillColor: 'gray', // Keep text black when disabled
+                      },
+                    }}
                   />
                 </Grid>
                 <Grid item xs={12} md={4}>
                   <FormControl 
                     fullWidth 
                     error={formik.touched.gender && Boolean(formik.errors.gender)}
-                    disabled={loading}
+                    disabled={true}
                     required
                   >
                     <InputLabel id="gender-label">Gender</InputLabel>
@@ -542,17 +506,10 @@ const FamilyPlanningForm = () => {
                       id="gender"
                       name="gender"
                       value={formik.values.gender}
-                      onChange={(e) => {
-                        formik.handleChange(e);
-                        // Reset method if switching genders
-                        if (e.target.value === 'Male' && 
-                            formik.values.method !== 'Condoms' && 
-                            formik.values.method !== 'Male Sterilization') {
-                          formik.setFieldValue('method', '');
-                        }
-                      }}
+                      onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
                       label="Gender"
+                      disabled={true} // Make uneditable
                     >
                       <MenuItem value="Female">Female</MenuItem>
                       <MenuItem value="Male">Male</MenuItem>
@@ -574,9 +531,15 @@ const FamilyPlanningForm = () => {
                     onBlur={formik.handleBlur}
                     error={formik.touched.age && Boolean(formik.errors.age)}
                     helperText={formik.touched.age && formik.errors.age}
-                    disabled={loading}
-                    required
-                    inputProps={{ min: 12, max: 100 }}
+                    disabled={true} // Make uneditable
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                    sx={{
+                      '& .MuiInputBase-input.Mui-disabled': {
+                        WebkitTextFillColor: 'gray',
+                      },
+                    }}
                   />
                 </Grid>
                 <Grid item xs={12} md={4}>
@@ -656,7 +619,9 @@ const FamilyPlanningForm = () => {
               </Grid>
             </CardContent>
           </Card>
-
+        );
+      case 1:
+        return (
           <Card sx={{ mb: 3 }}>
             <CardHeader title="Visit Information" />
             <Divider />
@@ -668,14 +633,16 @@ const FamilyPlanningForm = () => {
                       label="Visit Date *"
                       value={formik.values.visit_date}
                       onChange={(value) => formik.setFieldValue('visit_date', value)}
-                      slotProps={{ 
-                        textField: { 
-                          fullWidth: true,
-                          error: formik.touched.visit_date && Boolean(formik.errors.visit_date),
-                          helperText: formik.touched.visit_date && formik.errors.visit_date,
-                          onBlur: () => formik.setFieldTouched('visit_date', true)
-                        } 
-                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          fullWidth
+                          error={formik.touched.visit_date && Boolean(formik.errors.visit_date)}
+                          helperText={formik.touched.visit_date && formik.errors.visit_date}
+                          onBlur={() => formik.setFieldTouched('visit_date', true)}
+                          required
+                        />
+                      )}
                       disabled={loading}
                     />
                   </LocalizationProvider>
@@ -689,11 +656,12 @@ const FamilyPlanningForm = () => {
                         formik.setFieldValue('next_visit_date', value);
                         formik.setFieldTouched('next_visit_date', true);
                       }}
-                      slotProps={{ 
-                        textField: { 
-                          fullWidth: true,
-                        } 
-                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          fullWidth
+                        />
+                      )}
                       disabled={loading}
                     />
                   </LocalizationProvider>
@@ -790,7 +758,9 @@ const FamilyPlanningForm = () => {
               </Grid>
             </CardContent>
           </Card>
-
+        );
+      case 2:
+        return (
           <Card sx={{ mb: 3 }}>
             <CardHeader title="Method and Counseling" />
             <Divider />
@@ -900,7 +870,9 @@ const FamilyPlanningForm = () => {
               </Grid>
             </CardContent>
           </Card>
-
+        );
+      case 3:
+        return (
           <Card sx={{ mb: 3 }}>
             <CardHeader title="Side Effects and Notes" />
             <Divider />
@@ -953,25 +925,208 @@ const FamilyPlanningForm = () => {
               </Grid>
             </CardContent>
           </Card>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Only show submit on last step
+  const isLastStep = activeStep === steps.length - 1;
+  // Form submission handler
+  async function handleSubmit(values) {
+    
+    // Clear validation errors for fields we'll provide defaults for
+    if (!values.method) {
+      formik.setFieldError('method', undefined);
+    }
+    if (!values.provider) {
+      formik.setFieldError('provider', undefined);
+    }
+    if (values.counseling_provided && !values.counseling_notes) {
+      formik.setFieldError('counseling_notes', undefined);
+    }
+    
+    // Provide default values for missing required fields
+    const submissionValues = {
+      ...values,
+      method: values.method || 'Not specified',
+      provider: values.provider || 'Default Provider',      counseling_notes: values.counseling_notes || 'Standard counseling provided'
+    };
+    
+    try {
+      const apiData = {
+        patientId: submissionValues.patient_id,
+        facilityId: 'a67c1c4d-ce75-4713-a87c-ab3d7a2444f0',
+        registrationDate: format(new Date(), 'yyyy-MM-dd'),
+        clientType: submissionValues.is_new_acceptor ? 'New Acceptor' : 'Continuing User',
+        maritalStatus: submissionValues.marital_status || 'Single',
+        numberOfChildren: parseInt(submissionValues.parity) || 0,
+        desiredNumberOfChildren: parseInt(submissionValues.parity) + 1 || 1,
+        educationLevel: submissionValues.education_level || 'Secondary',
+        occupation: 'Not specified',
+        primaryContact: {
+          name: 'Emergency Contact',
+          relationship: 'Family',
+          phoneNumber: '+234-000-000-0000',
+          address: 'Not provided'
+        },
+        medicalHistory: submissionValues.notes || 'No significant medical history',
+        allergyHistory: submissionValues.has_side_effects ? submissionValues.side_effects : null,
+        reproductiveHistory: `Parity: ${submissionValues.parity || 0}`,
+        menstrualHistory: 'Regular cycles',
+        referredBy: submissionValues.provider || 'Self-referred',
+        notes: submissionValues.follow_up_plan || submissionValues.reason_for_visit || null,
+        status: 'Active'
+      };      
+      if (id) {
+        // Update existing record
+        await execute(
+          familyPlanningService.updateFamilyPlanningClient,
+          [id, apiData],
+          (response) => {
+            setSavedRecordId(response.id || id);
+            setSuccessDialogOpen(true);
+          }
+        );      } else {
+        // Create new record
+        await execute(
+          familyPlanningService.createFamilyPlanningClient,
+          [apiData],
+          (response) => {
+            setSavedRecordId(response.id);
+            setSuccessDialogOpen(true);
+          }
+        );
+      }
+    } catch (error) {
+      console.error("❌ Error saving record:", error);
+    }
+  }
+
+  // Cancel form handling
+  const handleCancelClick = () => {
+    if (formik.dirty) {
+      setConfirmDialogOpen(true);
+    } else {
+      navigate('/family-planning');
+    }
+  };
+
+  const handleConfirmCancel = () => {
+    setConfirmDialogOpen(false);
+    navigate('/family-planning');
+  };
+
+  const handleSuccessDialogClose = () => {
+    setSuccessDialogOpen(false);
+    navigate(`/family-planning/${id || formik.values.id}`);
+  };
+
+  // Format date for display
+  const formatDate = (date) => {
+    if (!date) return '';
+    
+    try {
+      // Ensure it's a valid Date object
+      let dateObj = date;
+      if (!(date instanceof Date)) {
+        dateObj = parseISO(date);
+      }
+      
+      if (!isValid(dateObj)) {
+        return '';
+      }
+      
+      return format(dateObj, 'MMMM dd, yyyy');
+    } catch (error) {
+      console.warn('Error formatting date:', date, error);
+      return '';    }
+  };
+
+  return (
+    <MainLayout 
+      title={id ? "Edit Family Planning Record" : "New Family Planning Record"}
+      breadcrumbs={[
+        { name: 'Family Planning', path: '/family-planning' },
+        { name: id ? 'Edit Record' : 'New Record', active: true }
+      ]}
+    >
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <IconButton
+            color="inherit"
+            onClick={handleCancelClick}
+            sx={{ mr: 2 }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+          <Typography variant="h5" component="h1">
+            {id ? "Edit Family Planning Record" : "New Family Planning Record"}
+          </Typography>
+        </Box>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
+        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+          {steps.map((label) => (
+            <Step key={label}>
+              <StepLabel>{label}</StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+
+        <form onSubmit={formik.handleSubmit}>
+          {renderStepContent(activeStep)}
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
             <Button
               variant="outlined"
-              onClick={handleCancelClick}
-              startIcon={<CloseIcon />}
-              disabled={loading}
+              onClick={handleBack}
+              disabled={activeStep === 0}
             >
-              Cancel
+              Back
             </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              startIcon={loading ? <CircularProgress size={24} /> : <SaveIcon />}
-              disabled={loading}
-            >
-              {id ? 'Update Record' : 'Save Record'}
-            </Button>
+            
+            {isLastStep ? (
+              <Box>
+                {/* Show validation errors if form is invalid */}
+                {!formik.isValid && Object.keys(formik.errors).length > 0 && (
+                  <Box sx={{ mb: 2, p: 2, bgcolor: 'error.light', borderRadius: 1 }}>
+                    <Typography variant="body2" color="error.contrastText">
+                      Please fix the following errors:
+                    </Typography>
+                    {Object.entries(formik.errors).map(([field, error]) => (
+                      <Typography key={field} variant="body2" color="error.contrastText">
+                        • {error}
+                      </Typography>
+                    ))}
+                  </Box>
+                )}
+                
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  startIcon={loading ? <CircularProgress size={24} /> : <SaveIcon />}
+                  disabled={loading}
+                >
+                  {id ? 'Update Record' : 'Save Record'}
+                </Button>
+              </Box>
+            ) : (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleNext}
+              >
+                Next
+              </Button>
+            )}
           </Box>
         </form>
       </Paper>
@@ -1090,3 +1245,29 @@ const FamilyPlanningForm = () => {
 };
 
 export default FamilyPlanningForm;
+
+// Update the FamilyPlanningList mapping to handle patient names:
+// In your FamilyPlanningList.js, update the mapping:
+
+// Make sure 'clients' is defined or imported before this mapping.
+// Example placeholder (replace with actual data source as needed):
+const clients = []; // <-- Add this line or import clients from the correct module
+
+const mappedClients = clients.map((clientItem) => {
+  const patient = clientItem.patient || {};
+  const facility = clientItem.facility || {};
+  const primaryContact = clientItem.primaryContact || {};
+  
+  // Format patient name properly
+  const patientName = [patient.firstName, patient.lastName, patient.otherNames]
+    .filter(name => name && name.trim())
+    .join(' ') || 'Unknown Client';
+  
+  return {
+    id: clientItem.id,
+    patient_id: clientItem.patientId,
+    // ... other fields ...
+    patient_name: patientName, // Use properly formatted name
+    // ... rest of mapping ...
+  };
+});

@@ -51,75 +51,15 @@ import {
   Event as EventIcon,
   CheckCircle as CheckIcon,
   Warning as WarningIcon,
-  Error as ErrorIcon
+  Error as ErrorIcon,
+  Phone as PhoneIcon,
+  Female as FemaleIcon,
+  Male as MaleIcon
 } from '@mui/icons-material';
 import { format, parseISO, addMonths, differenceInMonths } from 'date-fns';
 import MainLayout from '../../components/common/Layout/MainLayout';
 import { useApi } from '../../hooks/useApi';
-
-// Mock immunization service - replace with actual service when available
-const immunizationService = {
-  getImmunizationById: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockImmunization = {
-          id,
-          registration_number: `IM${10000 + parseInt(id)}`,
-          patient_name: `${parseInt(id) % 2 === 0 ? 'John' : 'Jane'} Doe ${id}`,
-          patient_id: `PT${5000 + parseInt(id)}`,
-          gender: parseInt(id) % 2 === 0 ? 'Male' : 'Female',
-          date_of_birth: new Date(2020 - (parseInt(id) % 5), (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          age_months: 12 + (parseInt(id) % 48),
-          vaccine_type: ['BCG', 'Hepatitis B', 'OPV', 'Pentavalent', 'Pneumococcal', 'Rotavirus', 'Measles', 'Yellow Fever'][parseInt(id) % 8],
-          dose_number: (parseInt(id) % 3) + 1,
-          lot_number: `LOT${100 + parseInt(id)}`,
-          vaccination_date: new Date(2023, (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          next_due_date: parseInt(id) % 3 === 2 ? null : new Date(2023, (parseInt(id) % 12) + 2, parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          healthcare_provider: `Nurse ${parseInt(id) % 10 + 1}`,
-          provider_id: `NUR${1000 + parseInt(id) % 20}`,
-          facility: `Health Center ${parseInt(id) % 5 + 1}`,
-          facility_id: `FAC${parseInt(id) % 5 + 1}`,
-          status: parseInt(id) % 10 === 0 ? 'pending' : (parseInt(id) % 10 === 1 ? 'missed' : 'completed'),
-          side_effects: parseInt(id) % 15 === 0 ? 'Mild fever' : (parseInt(id) % 20 === 0 ? 'Swelling at injection site' : null),
-          notes: parseInt(id) % 8 === 0 ? 'Follow up required due to previous adverse reaction' : null,
-          created_at: new Date(2023, (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString(),
-          weight_kg: 5 + (parseInt(id) % 20),
-          height_cm: 50 + (parseInt(id) % 30),
-          site_of_administration: parseInt(id) % 2 === 0 ? 'Left Arm' : 'Right Thigh',
-          route_of_administration: parseInt(id) % 3 === 0 ? 'Intramuscular' : (parseInt(id) % 3 === 1 ? 'Subcutaneous' : 'Oral')
-        };
-        resolve(mockImmunization);
-      }, 500);
-    });
-  },
-  getImmunizationHistory: async (patientId) => {
-    // Simulate API call to get immunization history for this patient
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const historyCount = 3 + (parseInt(patientId) % 5);
-        const history = Array.from({ length: historyCount }, (_, i) => ({
-          id: 100 + i,
-          vaccine_type: ['BCG', 'Hepatitis B', 'OPV', 'Pentavalent', 'Pneumococcal', 'Rotavirus', 'Measles', 'Yellow Fever'][i % 8],
-          dose_number: (i % 3) + 1,
-          vaccination_date: new Date(2022, i, 15).toISOString().split('T')[0],
-          healthcare_provider: `Nurse ${i % 10 + 1}`,
-          facility: `Health Center ${i % 5 + 1}`,
-          status: i === historyCount - 1 ? 'pending' : 'completed'
-        }));
-        resolve(history);
-      }, 300);
-    });
-  },
-  deleteImmunization: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ success: true });
-      }, 300);
-    });
-  }
-};
+import immunizationService from '../../services/immunizationService';
 
 // Tab panel component
 function TabPanel(props) {
@@ -155,6 +95,19 @@ const ImmunizationDetail = () => {
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
   const [certificateDialogOpen, setCertificateDialogOpen] = useState(false);
 
+  // Helper function to calculate age
+  const calculateAge = (dateOfBirth) => {
+    if (!dateOfBirth) return null;
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
   // Fetch immunization record data
   useEffect(() => {
     const loadImmunization = async () => {
@@ -162,14 +115,87 @@ const ImmunizationDetail = () => {
         immunizationService.getImmunizationById,
         [id],
         (response) => {
-          setImmunization(response);
+          console.log('Loaded immunization record:', response);
+          
+          // Map API response to component format
+          const immunizationData = response.data || response;
+          const patient = immunizationData.patient || {};
+          const facility = immunizationData.facility || {};
+          
+          const mappedImmunization = {
+            id: immunizationData.id,
+            registration_number: `IM-${new Date().getFullYear()}-${immunizationData.id ? immunizationData.id.substring(0, 8) : '00000000'}`,
+            
+            // Patient information from nested patient object
+            patient_name: patient.firstName && patient.lastName ? 
+              `${patient.firstName} ${patient.lastName}` : 
+              'Unknown Patient',
+            patient_id: immunizationData.patientId,
+            gender: patient.gender || 'Unknown',
+            date_of_birth: patient.dateOfBirth,
+            age_months: immunizationData.ageMonths || calculateAge(patient.dateOfBirth) * 12,
+            
+            // Vaccine information
+            vaccine_type: immunizationData.vaccineType,
+            vaccine_name: immunizationData.vaccineName,
+            dose_number: immunizationData.doseNumber,
+            lot_number: immunizationData.batchNumber,
+            vaccination_date: immunizationData.administrationDate,
+            next_due_date: immunizationData.nextDoseDate,
+            expiry_date: immunizationData.expiryDate,
+            
+            // Administration details
+            healthcare_provider: immunizationData.administeredBy,
+            provider_id: immunizationData.providerId || 'N/A',
+            facility: facility.name || 'Unknown Facility',
+            facility_id: immunizationData.facilityId,
+            facility_type: facility.facilityType,
+            facility_lga: facility.lga,
+            administration_site: immunizationData.administrationSite,
+            administration_route: immunizationData.administrationRoute,
+            dosage: immunizationData.dosage,
+            
+            // Medical measurements
+            weight_kg: immunizationData.weightKg,
+            height_cm: immunizationData.heightCm,
+            
+            // Status and effects
+            status: immunizationData.status?.toLowerCase() || 'administered',
+            side_effects: immunizationData.sideEffects,
+            notes: immunizationData.notes,
+            
+            // Timestamps
+            created_at: immunizationData.createdAt,
+            updated_at: immunizationData.updatedAt
+          };
+          
+          setImmunization(mappedImmunization);
           
           // Also fetch immunization history for this patient
           execute(
-            immunizationService.getImmunizationHistory,
-            [response.patient_id],
+            immunizationService.getPatientImmunizationHistory,
+            [mappedImmunization.patient_id],
             (historyResponse) => {
-              setImmunizationHistory(historyResponse);
+              console.log('Immunization history:', historyResponse);
+              const historyData = historyResponse.data || historyResponse || [];
+              
+              const mappedHistory = historyData.map((item) => {
+                const historyPatient = item.patient || {};
+                const historyFacility = item.facility || {};
+                
+                return {
+                  id: item.id,
+                  vaccine_type: item.vaccineType,
+                  vaccine_name: item.vaccineName,
+                  dose_number: item.doseNumber,
+                  vaccination_date: item.administrationDate,
+                  healthcare_provider: item.administeredBy,
+                  facility: historyFacility.name || 'Unknown Facility',
+                  status: item.status?.toLowerCase() || 'administered'
+                };
+              });
+              
+              setImmunizationHistory(mappedHistory);
             }
           );
         }
@@ -177,7 +203,7 @@ const ImmunizationDetail = () => {
     };
     
     loadImmunization();
-  }, [id]);
+  }, [id, execute]);
 
   // Handle tab change
   const handleTabChange = (event, newValue) => {
@@ -196,7 +222,7 @@ const ImmunizationDetail = () => {
 
   // Navigation actions
   const handleEditImmunization = () => {
-    navigate(`/immunizations/${id}/edit`);  // Changed from '/immunization/${id}/edit' to '/immunizations/${id}/edit'
+    navigate(`/immunizations/${id}/edit`);
   };
 
   // Handle delete
@@ -264,12 +290,16 @@ const ImmunizationDetail = () => {
 
   // Get status color
   const getStatusColor = (status) => {
-    switch (status) {
+    const statusLower = status?.toLowerCase();
+    switch (statusLower) {
+      case 'administered':
       case 'completed':
         return 'success';
       case 'pending':
+      case 'scheduled':
         return 'warning';
       case 'missed':
+      case 'cancelled':
         return 'error';
       default:
         return 'default';
@@ -278,12 +308,16 @@ const ImmunizationDetail = () => {
 
   // Get status icon
   const getStatusIcon = (status) => {
-    switch (status) {
+    const statusLower = status?.toLowerCase();
+    switch (statusLower) {
+      case 'administered':
       case 'completed':
         return <CheckIcon color="success" />;
       case 'pending':
+      case 'scheduled':
         return <WarningIcon color="warning" />;
       case 'missed':
+      case 'cancelled':
         return <ErrorIcon color="error" />;
       default:
         return null;
@@ -423,7 +457,16 @@ const ImmunizationDetail = () => {
         <Box sx={{ mb: 4 }}>
           <Card>
             <CardHeader
-              title={immunization.patient_name}
+              title={
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <PersonIcon sx={{ mr: 1 }} />
+                  {immunization.patient_name}
+                  {immunization.gender === 'female' ? 
+                    <FemaleIcon color="secondary" sx={{ ml: 1 }} /> : 
+                    <MaleIcon color="primary" sx={{ ml: 1 }} />
+                  }
+                </Box>
+              }
               subheader={`Registration Number: ${immunization.registration_number} | Patient ID: ${immunization.patient_id}`}
               action={
                 <Chip 
@@ -443,7 +486,10 @@ const ImmunizationDetail = () => {
                     Vaccine
                   </Typography>
                   <Typography variant="body1" gutterBottom>
-                    {immunization.vaccine_type} (Dose {immunization.dose_number})
+                    {immunization.vaccine_name || immunization.vaccine_type}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Dose {immunization.dose_number}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
@@ -495,7 +541,12 @@ const ImmunizationDetail = () => {
           <TabPanel value={tabValue} index={0}>
             <Card>
               <CardHeader
-                title="Vaccination Details"
+                title={
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <VaccinesIcon sx={{ mr: 1 }} />
+                    Vaccination Details
+                  </Box>
+                }
               />
               <Divider />
               <CardContent>
@@ -510,6 +561,14 @@ const ImmunizationDetail = () => {
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
+                      Vaccine Name
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {immunization.vaccine_name}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
                       Dose Number
                     </Typography>
                     <Typography variant="body1" gutterBottom>
@@ -518,7 +577,7 @@ const ImmunizationDetail = () => {
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
-                      Lot Number
+                      Batch/Lot Number
                     </Typography>
                     <Typography variant="body1" gutterBottom>
                       {immunization.lot_number}
@@ -530,6 +589,14 @@ const ImmunizationDetail = () => {
                     </Typography>
                     <Typography variant="body1" gutterBottom>
                       {formatDate(immunization.vaccination_date)}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Expiry Date
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {formatDate(immunization.expiry_date)}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
@@ -556,18 +623,26 @@ const ImmunizationDetail = () => {
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
-                      Site of Administration
+                      Administration Site
                     </Typography>
                     <Typography variant="body1" gutterBottom>
-                      {immunization.site_of_administration}
+                      {immunization.administration_site}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
-                      Route of Administration
+                      Administration Route
                     </Typography>
                     <Typography variant="body1" gutterBottom>
-                      {immunization.route_of_administration}
+                      {immunization.administration_route}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Dosage
+                    </Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {immunization.dosage}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
@@ -577,23 +652,31 @@ const ImmunizationDetail = () => {
                     <Typography variant="body1" gutterBottom>
                       {immunization.facility}
                     </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {immunization.facility_lga}
+                    </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
                       Healthcare Provider
                     </Typography>
                     <Typography variant="body1" gutterBottom>
-                      {immunization.healthcare_provider} ({immunization.provider_id})
+                      {immunization.healthcare_provider}
                     </Typography>
+                    {immunization.provider_id && immunization.provider_id !== 'N/A' && (
+                      <Typography variant="body2" color="text.secondary">
+                        ID: {immunization.provider_id}
+                      </Typography>
+                    )}
                   </Grid>
                   {immunization.side_effects && (
                     <Grid item xs={12}>
                       <Typography variant="subtitle2" color="text.secondary">
                         Side Effects
                       </Typography>
-                      <Typography variant="body1" gutterBottom>
+                      <Alert severity="warning" sx={{ mt: 1 }}>
                         {immunization.side_effects}
-                      </Typography>
+                      </Alert>
                     </Grid>
                   )}
                   {immunization.notes && (
@@ -601,9 +684,11 @@ const ImmunizationDetail = () => {
                       <Typography variant="subtitle2" color="text.secondary">
                         Notes
                       </Typography>
-                      <Typography variant="body1" gutterBottom>
-                        {immunization.notes}
-                      </Typography>
+                      <Paper variant="outlined" sx={{ p: 2, mt: 1 }}>
+                        <Typography variant="body2">
+                          {immunization.notes}
+                        </Typography>
+                      </Paper>
                     </Grid>
                   )}
                 </Grid>
@@ -615,7 +700,12 @@ const ImmunizationDetail = () => {
           <TabPanel value={tabValue} index={1}>
             <Card>
               <CardHeader
-                title="Patient Details"
+                title={
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <PersonIcon sx={{ mr: 1 }} />
+                    Patient Details
+                  </Box>
+                }
               />
               <Divider />
               <CardContent>
@@ -640,9 +730,15 @@ const ImmunizationDetail = () => {
                     <Typography variant="subtitle2" color="text.secondary">
                       Gender
                     </Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {immunization.gender}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      {immunization.gender === 'female' ? 
+                        <FemaleIcon color="secondary" fontSize="small" sx={{ mr: 1 }} /> : 
+                        <MaleIcon color="primary" fontSize="small" sx={{ mr: 1 }} />
+                      }
+                      <Typography variant="body1">
+                        {immunization.gender ? immunization.gender.charAt(0).toUpperCase() + immunization.gender.slice(1) : 'Unknown'}
+                      </Typography>
+                    </Box>
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
@@ -662,18 +758,18 @@ const ImmunizationDetail = () => {
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
-                      Weight
+                      Weight at Vaccination
                     </Typography>
                     <Typography variant="body1" gutterBottom>
-                      {immunization.weight_kg} kg
+                      {immunization.weight_kg ? `${immunization.weight_kg} kg` : 'Not recorded'}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6} md={4}>
                     <Typography variant="subtitle2" color="text.secondary">
-                      Height
+                      Height at Vaccination
                     </Typography>
                     <Typography variant="body1" gutterBottom>
-                      {immunization.height_cm} cm
+                      {immunization.height_cm ? `${immunization.height_cm} cm` : 'Not recorded'}
                     </Typography>
                   </Grid>
                 </Grid>
@@ -685,7 +781,12 @@ const ImmunizationDetail = () => {
           <TabPanel value={tabValue} index={2}>
             <Card>
               <CardHeader
-                title="Medical Information"
+                title={
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <MedicalIcon sx={{ mr: 1 }} />
+                    Medical Information
+                  </Box>
+                }
               />
               <Divider />
               <CardContent>
@@ -701,20 +802,18 @@ const ImmunizationDetail = () => {
                           <TableCell>Dosage</TableCell>
                           <TableCell>Route</TableCell>
                           <TableCell>Site</TableCell>
-                          <TableCell>Lot Number</TableCell>
+                          <TableCell>Batch Number</TableCell>
                           <TableCell>Expiry Date</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         <TableRow>
-                          <TableCell>{immunization.vaccine_type}</TableCell>
-                          <TableCell>Dose {immunization.dose_number}</TableCell>
-                          <TableCell>{immunization.route_of_administration}</TableCell>
-                          <TableCell>{immunization.site_of_administration}</TableCell>
+                          <TableCell>{immunization.vaccine_name || immunization.vaccine_type}</TableCell>
+                          <TableCell>{immunization.dosage}</TableCell>
+                          <TableCell>{immunization.administration_route}</TableCell>
+                          <TableCell>{immunization.administration_site}</TableCell>
                           <TableCell>{immunization.lot_number}</TableCell>
-                          <TableCell>
-                            {format(addMonths(parseISO(immunization.vaccination_date), 6), 'MM/yyyy')}
-                          </TableCell>
+                          <TableCell>{formatDate(immunization.expiry_date)}</TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -734,27 +833,32 @@ const ImmunizationDetail = () => {
                         {immunization.healthcare_provider}
                       </Typography>
                     </Grid>
-                    <Grid item xs={12} sm={6} md={4}>
-                      <Typography variant="subtitle2" color="text.secondary">
-                        Provider ID
-                      </Typography>
-                      <Typography variant="body1" gutterBottom>
-                        {immunization.provider_id}
-                      </Typography>
-                    </Grid>
+                    {immunization.provider_id && immunization.provider_id !== 'N/A' && (
+                      <Grid item xs={12} sm={6} md={4}>
+                        <Typography variant="subtitle2" color="text.secondary">
+                          Provider ID
+                        </Typography>
+                        <Typography variant="body1" gutterBottom>
+                          {immunization.provider_id}
+                        </Typography>
+                      </Grid>
+                    )}
                     <Grid item xs={12} sm={6} md={4}>
                       <Typography variant="subtitle2" color="text.secondary">
                         Facility
                       </Typography>
                       <Typography variant="body1" gutterBottom>
-                        {immunization.facility} ({immunization.facility_id})
+                        {immunization.facility}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {immunization.facility_type} - {immunization.facility_lga}
                       </Typography>
                     </Grid>
                   </Grid>
                 </Box>
 
                 {immunization.side_effects && (
-                  <Box>
+                  <Box sx={{ mb: 3 }}>
                     <Typography variant="subtitle1" gutterBottom>
                       Adverse Events/Side Effects
                     </Typography>
@@ -784,7 +888,12 @@ const ImmunizationDetail = () => {
           <TabPanel value={tabValue} index={3}>
             <Card>
               <CardHeader
-                title="Patient Immunization History"
+                title={
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <EventIcon sx={{ mr: 1 }} />
+                    Patient Immunization History
+                  </Box>
+                }
                 subheader={`Immunization history for ${immunization.patient_name} (${immunization.patient_id})`}
               />
               <Divider />
@@ -799,6 +908,7 @@ const ImmunizationDetail = () => {
                       <TableHead>
                         <TableRow>
                           <TableCell>Vaccine</TableCell>
+                          <TableCell>Vaccine Name</TableCell>
                           <TableCell>Dose</TableCell>
                           <TableCell>Date</TableCell>
                           <TableCell>Provider</TableCell>
@@ -822,6 +932,7 @@ const ImmunizationDetail = () => {
                             }}
                           >
                             <TableCell>{record.vaccine_type}</TableCell>
+                            <TableCell>{record.vaccine_name}</TableCell>
                             <TableCell>Dose {record.dose_number}</TableCell>
                             <TableCell>{formatDate(record.vaccination_date)}</TableCell>
                             <TableCell>{record.healthcare_provider}</TableCell>
@@ -910,7 +1021,7 @@ const ImmunizationDetail = () => {
               </Grid>
               <Grid item xs={12}>
                 <Typography variant="h6" align="center" gutterBottom>
-                  {immunization.vaccine_type} - Dose {immunization.dose_number}
+                  {immunization.vaccine_name || immunization.vaccine_type} - Dose {immunization.dose_number}
                 </Typography>
               </Grid>
               <Grid item xs={12}>
@@ -942,7 +1053,7 @@ const ImmunizationDetail = () => {
               </Grid>
               <Grid item xs={6}>
                 <Typography variant="body2" gutterBottom align="right">
-                  Lot Number: {immunization.lot_number}
+                  Batch Number: {immunization.lot_number}
                 </Typography>
               </Grid>
               <Grid item xs={12} sx={{ mt: 4 }}>

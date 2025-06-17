@@ -114,7 +114,8 @@ const FamilyPlanningList = () => {
   // }, []);
   // Fetch family planning records
   const fetchRecords = useCallback(async () => {
-    try {      // Map frontend filters to API query params
+    try {
+      // Map frontend filters to API query params
       const queryParams = {
         page: page + 1,
         limit: pageSize,
@@ -153,57 +154,97 @@ const FamilyPlanningList = () => {
         default:
           // All Records - no additional filters
           break;
-      }console.log('Fetching family planning clients with params:', queryParams);
+      }
+
+  
 
       await execute(
         familyPlanningService.getAllFamilyPlanningClients,
         [queryParams],
         async (response) => {
-          console.log('API response:', response);
           
           // Handle the response structure
           const clients = response.data || [];
           const pagination = response.pagination || { total: clients.length };
 
-          // Map the clients and enhance with patient data
-          const mappedClients = await Promise.all(
-            clients.map(async (clientItem) => {
-              const mappedClient = familyPlanningService.mapFamilyPlanningClient(clientItem);
-                // Try to get client information
-              try {
-                if (mappedClient.client_id && patientService) {
-                  const clientData = await patientService.getPatientById(mappedClient.client_id);
-                  if (clientData) {
-                    mappedClient.patient_name = clientData.firstName && clientData.lastName ? 
-                      `${clientData.firstName} ${clientData.lastName}${clientData.otherNames ? ' ' + clientData.otherNames : ''}` :
-                      clientData.name || mappedClient.patient_name || 'Unknown Client';
-                    mappedClient.age = clientData.age || calculateAge(clientData.dateOfBirth);
-                    mappedClient.gender = clientData.gender;
-                    mappedClient.marital_status = clientData.maritalStatus;
-                    mappedClient.education_level = clientData.educationLevel;
-                  }
-                }
-              } catch (clientError) {
-                console.warn('Could not fetch client data for:', mappedClient.client_id, clientError);
-                // Use a fallback name
-                if (!mappedClient.patient_name || mappedClient.patient_name === 'Loading...') {
-                  mappedClient.patient_name = `Client ${mappedClient.client_id ? mappedClient.client_id.substring(0, 8) : 'Unknown'}`;
-                }
-              }              // Client data is now complete
-              return mappedClient;
-            })
-          );          // Apply client-side filtering if needed
+          // Map the clients directly from API response
+          const mappedClients = clients.map((clientItem) => {
+            // Extract patient data from the nested patient object
+            const patient = clientItem.patient || {};
+            const facility = clientItem.facility || {};
+            const primaryContact = clientItem.primaryContact || {};
+            
+            return {
+              id: clientItem.id,
+              patient_id: clientItem.patientId,
+              facility_id: clientItem.facilityId,
+              registration_date: clientItem.registrationDate,
+              client_type: clientItem.clientType,
+              marital_status: clientItem.maritalStatus,
+              number_of_children: clientItem.numberOfChildren,
+              desired_number_of_children: clientItem.desiredNumberOfChildren,
+              education_level: clientItem.educationLevel,
+              occupation: clientItem.occupation,
+              primary_contact: primaryContact,
+              medical_history: clientItem.medicalHistory,
+              allergy_history: clientItem.allergyHistory,
+              reproductive_history: clientItem.reproductiveHistory,
+              menstrual_history: clientItem.menstrualHistory,
+              referred_by: clientItem.referredBy,
+              notes: clientItem.notes,
+              status: clientItem.status,
+              created_by: clientItem.createdBy,
+              updated_by: clientItem.updatedBy,
+              created_at: clientItem.createdAt,
+              updated_at: clientItem.updatedAt,
+              deleted_at: clientItem.deletedAt,
+              
+              // Patient information from nested patient object
+              patient_name: patient.firstName && patient.lastName ? 
+                `${patient.firstName} ${patient.lastName}` : 
+                'Unknown Client',
+              gender: patient.gender,
+              date_of_birth: patient.dateOfBirth,
+              age: patient.dateOfBirth ? calculateAge(patient.dateOfBirth) : null,
+              phone_number: patient.phoneNumber,
+              
+              // Facility information
+              facility_name: facility.name,
+              facility_type: facility.facilityType,
+              facility_lga: facility.lga,
+              
+              // Contact information
+              contact_name: primaryContact.name || 'Not provided',
+              contact_phone: primaryContact.phoneNumber || 'Not provided',
+              contact_relationship: primaryContact.relationship || 'Not provided',
+              contact_address: primaryContact.address || 'Not provided',
+              
+              // Computed fields for display
+              record_id: `FPC${clientItem.id ? clientItem.id.substring(0, 8) : '00000000'}`,
+              is_new_acceptor: clientItem.clientType === 'New Acceptor',
+              is_active: clientItem.status === 'Active'
+            };
+          });
+
+          // Apply client-side filtering if needed (for search)
           let finalClients = mappedClients;
-          if (tabValue === 4) { // Continuing Users tab
-            finalClients = mappedClients.filter(client => client.client_type === 'Continuing User');
+          if (searchTerm) {
+            const searchLower = searchTerm.toLowerCase();
+            finalClients = mappedClients.filter(client => 
+              client.patient_name?.toLowerCase().includes(searchLower) ||
+              client.record_id?.toLowerCase().includes(searchLower) ||
+              client.contact_name?.toLowerCase().includes(searchLower) ||
+              client.phone_number?.toLowerCase().includes(searchLower)
+            );
           }
 
           setRecords(finalClients);
-          setTotalRecords(pagination.total || finalClients.length);
+          setTotalRecords(pagination.totalItems || finalClients.length);
         }
       );
     } catch (error) {
-      console.error('Error fetching family planning clients:', error);      setRecords([]);
+      console.error('Error fetching family planning clients:', error);
+      setRecords([]);
       setTotalRecords(0);
     }
   }, [page, pageSize, searchTerm, filters, tabValue, execute]);
