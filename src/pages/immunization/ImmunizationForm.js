@@ -54,133 +54,9 @@ import { useApi } from '../../hooks/useApi';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { format, differenceInMonths, addMonths, parseISO } from 'date-fns';
-
-// Mock immunization service - replace with actual service when available
-const immunizationService = {
-  getImmunizationById: async (id) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockImmunization = {
-          id,
-          registration_number: `IM${10000 + parseInt(id)}`,
-          patient_name: `${parseInt(id) % 2 === 0 ? 'John' : 'Jane'} Doe ${id}`,
-          patient_id: `PT${5000 + parseInt(id)}`,
-          gender: parseInt(id) % 2 === 0 ? 'Male' : 'Female',
-          date_of_birth: new Date(2020 - (parseInt(id) % 5), (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          age_months: 12 + (parseInt(id) % 48),
-          vaccine_type: ['BCG', 'Hepatitis B', 'OPV', 'Pentavalent', 'Pneumococcal', 'Rotavirus', 'Measles', 'Yellow Fever'][parseInt(id) % 8],
-          dose_number: (parseInt(id) % 3) + 1,
-          lot_number: `LOT${100 + parseInt(id)}`,
-          vaccination_date: new Date(2023, (parseInt(id) % 12), parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          next_due_date: parseInt(id) % 3 === 2 ? null : new Date(2023, (parseInt(id) % 12) + 2, parseInt(id) % 28 + 1).toISOString().split('T')[0],
-          healthcare_provider: `Nurse ${parseInt(id) % 10 + 1}`,
-          provider_id: `NUR${1000 + parseInt(id) % 20}`,
-          facility: `Health Center ${parseInt(id) % 5 + 1}`,
-          facility_id: `FAC${parseInt(id) % 5 + 1}`,
-          status: parseInt(id) % 10 === 0 ? 'pending' : (parseInt(id) % 10 === 1 ? 'missed' : 'completed'),
-          side_effects: parseInt(id) % 15 === 0 ? 'Mild fever' : (parseInt(id) % 20 === 0 ? 'Swelling at injection site' : null),
-          notes: parseInt(id) % 8 === 0 ? 'Follow up required due to previous adverse reaction' : null,
-          weight_kg: 5 + (parseInt(id) % 20),
-          height_cm: 50 + (parseInt(id) % 30),
-          site_of_administration: parseInt(id) % 2 === 0 ? 'Left Arm' : 'Right Thigh',
-          route_of_administration: parseInt(id) % 3 === 0 ? 'Intramuscular' : (parseInt(id) % 3 === 1 ? 'Subcutaneous' : 'Oral')
-        };
-        resolve(mockImmunization);
-      }, 500);
-    });
-  },
-  createImmunization: async (data) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ 
-          success: true, 
-          id: Math.floor(Math.random() * 1000),
-          ...data
-        });
-      }, 500);
-    });
-  },
-  updateImmunization: async (id, data) => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ 
-          success: true, 
-          id,
-          ...data
-        });
-      }, 500);
-    });
-  },
-  searchPatients: async (searchTerm) => {
-    // Simulate API call to search patients
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Generate mock patients based on search term
-        const mockPatients = Array.from({ length: 5 }, (_, i) => ({
-          id: `PT${5000 + i}`,
-          name: `${searchTerm} ${['Smith', 'Johnson', 'Williams', 'Brown', 'Jones'][i]}`,
-          gender: i % 2 === 0 ? 'Male' : 'Female',
-          date_of_birth: new Date(2020 - (i % 5), (i % 12), i % 28 + 1).toISOString().split('T')[0],
-        }));
-        resolve(mockPatients);
-      }, 300);
-    });
-  },
-  getVaccineSchedule: async (vaccineType, doseNumber) => {
-    // Simulate API call to get vaccine schedule information
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Default interval (in months) between doses for different vaccines
-        const scheduleIntervals = {
-          'BCG': 0, // One time only
-          'Hepatitis B': 2,
-          'OPV': 2,
-          'Pentavalent': 2,
-          'Pneumococcal': 2,
-          'Rotavirus': 2,
-          'Measles': 6,
-          'Yellow Fever': 0, // One time only
-          'Meningitis': 0, // One time only
-          'Tetanus Toxoid': 1,
-          'HPV': 6,
-          'COVID-19': 1,
-          'Other': 1
-        };
-        
-        // Max doses for each vaccine
-        const maxDoses = {
-          'BCG': 1,
-          'Hepatitis B': 3,
-          'OPV': 4,
-          'Pentavalent': 3,
-          'Pneumococcal': 3,
-          'Rotavirus': 2,
-          'Measles': 2,
-          'Yellow Fever': 1,
-          'Meningitis': 1,
-          'Tetanus Toxoid': 5,
-          'HPV': 2,
-          'COVID-19': 2,
-          'Other': 3
-        };
-        
-        // Determine if next dose is needed
-        const interval = scheduleIntervals[vaccineType] || 1;
-        const isLastDose = doseNumber >= (maxDoses[vaccineType] || 1);
-        
-        resolve({
-          interval: interval,
-          isLastDose: isLastDose,
-          maxDoses: maxDoses[vaccineType] || 1
-        });
-      }, 200);
-    });
-  }
-};
+import { format, differenceInMonths, addMonths, parseISO, isValid } from 'date-fns';
+import immunizationService from '../../services/immunizationService';
+import patientService from '../../services/patientService';
 
 // Vaccine types
 const vaccineTypes = [
@@ -199,75 +75,113 @@ const vaccineTypes = [
   'Other'
 ];
 
-// Facilities list
-const facilities = [
-  { id: 'FAC1', name: 'Health Center 1' },
-  { id: 'FAC2', name: 'Health Center 2' },
-  { id: 'FAC3', name: 'Health Center 3' },
-  { id: 'FAC4', name: 'Health Center 4' },
-  { id: 'FAC5', name: 'Health Center 5' }
-];
+// Helper function to safely parse dates
+const safeParseDate = (dateValue) => {
+  if (!dateValue) return null;
+  
+  try {
+    // Handle different date formats
+    let date;
+    if (typeof dateValue === 'string') {
+      date = parseISO(dateValue);
+    } else if (dateValue instanceof Date) {
+      date = dateValue;
+    } else {
+      return null;
+    }
+    
+    // Check if the date is valid
+    return isValid(date) ? date : null;
+  } catch (error) {
+    console.warn('Invalid date value:', dateValue, error);
+    return null;
+  }
+};
 
-// Healthcare providers list
-const healthcareProviders = [
-  { id: 'NUR1001', name: 'Nurse 1' },
-  { id: 'NUR1002', name: 'Nurse 2' },
-  { id: 'NUR1003', name: 'Nurse 3' },
-  { id: 'NUR1004', name: 'Nurse 4' },
-  { id: 'NUR1005', name: 'Nurse 5' },
-  { id: 'DOC1001', name: 'Doctor 1' },
-  { id: 'DOC1002', name: 'Doctor 2' }
-];
+// Helper function to safely format dates for API
+const safeDateFormat = (dateValue, fallback = null) => {
+  if (!dateValue) return fallback;
+  
+  try {
+    const date = safeParseDate(dateValue);
+    return date ? format(date, 'yyyy-MM-dd') : fallback;
+  } catch (error) {
+    console.warn('Error formatting date:', dateValue, error);
+    return fallback;
+  }
+};
+
+// Vaccine schedule information
+const getVaccineScheduleInfo = (vaccineType, doseNumber) => {
+  const scheduleIntervals = {
+    'BCG': 0,
+    'Hepatitis B': 2,
+    'OPV': 2,
+    'Pentavalent': 2,
+    'Pneumococcal': 2,
+    'Rotavirus': 2,
+    'Measles': 6,
+    'Yellow Fever': 0,
+    'Meningitis': 0,
+    'Tetanus Toxoid': 1,
+    'HPV': 6,
+    'COVID-19': 1,
+    'Other': 1
+  };
+  
+  const maxDoses = {
+    'BCG': 1,
+    'Hepatitis B': 3,
+    'OPV': 4,
+    'Pentavalent': 3,
+    'Pneumococcal': 3,
+    'Rotavirus': 2,
+    'Measles': 2,
+    'Yellow Fever': 1,
+    'Meningitis': 1,
+    'Tetanus Toxoid': 5,
+    'HPV': 2,
+    'COVID-19': 2,
+    'Other': 3
+  };
+  
+  const interval = scheduleIntervals[vaccineType] || 1;
+  const isLastDose = doseNumber >= (maxDoses[vaccineType] || 1);
+  
+  return {
+    interval: interval,
+    isLastDose: isLastDose,
+    maxDoses: maxDoses[vaccineType] || 1
+  };
+};
 
 // Form validation schema
 const immunizationValidationSchema = Yup.object({
   // Patient information
-  patient_id: Yup.string()
-    .required('Patient ID is required'),
-  patient_name: Yup.string()
-    .required('Patient name is required'),
-  date_of_birth: Yup.date()
-    .required('Date of birth is required')
-    .max(new Date(), 'Date of birth cannot be in the future'),
-  gender: Yup.string()
-    .required('Gender is required'),
+  patient_id: Yup.string().required('Patient ID is required'),
+  patient_name: Yup.string().required('Patient name is required'),
+  date_of_birth: Yup.date().required('Date of birth is required').max(new Date(), 'Date of birth cannot be in the future'),
+  gender: Yup.string().required('Gender is required'),
   
   // Vaccination details
-  vaccine_type: Yup.string()
-    .required('Vaccine type is required'),
-  dose_number: Yup.number()
-    .required('Dose number is required')
-    .positive('Dose number must be positive')
-    .integer('Dose number must be an integer'),
-  lot_number: Yup.string()
-    .required('Lot number is required'),
-  vaccination_date: Yup.date()
-    .required('Vaccination date is required')
-    .max(new Date(), 'Vaccination date cannot be in the future'),
+  vaccine_type: Yup.string().required('Vaccine type is required'),
+  vaccine_name: Yup.string().required('Vaccine name is required'),
+  dose_number: Yup.number().required('Dose number is required').positive('Dose number must be positive').integer('Dose number must be an integer'),
+  lot_number: Yup.string().required('Batch/Lot number is required'),
+  vaccination_date: Yup.date().required('Vaccination date is required').max(new Date(), 'Vaccination date cannot be in the future'),
   
   // Administration details
-  site_of_administration: Yup.string()
-    .required('Site of administration is required'),
-  route_of_administration: Yup.string()
-    .required('Route of administration is required'),
-  healthcare_provider: Yup.string()
-    .required('Healthcare provider is required'),
-  facility: Yup.string()
-    .required('Facility is required'),
+  site_of_administration: Yup.string().required('Site of administration is required'),
+  route_of_administration: Yup.string().required('Route of administration is required'),
+  healthcare_provider: Yup.string().required('Healthcare provider is required'),
+  facility_id: Yup.string().required('Facility is required'),
   
-  // Other details (optional)
-  weight_kg: Yup.number()
-    .positive('Weight must be positive')
-    .nullable(),
-  height_cm: Yup.number()
-    .positive('Height must be positive')
-    .nullable(),
-  side_effects: Yup.string()
-    .nullable(),
-  notes: Yup.string()
-    .nullable(),
-  status: Yup.string()
-    .required('Status is required')
+  // Optional fields
+  weight_kg: Yup.number().positive('Weight must be positive').nullable(),
+  height_cm: Yup.number().positive('Height must be positive').nullable(),
+  side_effects: Yup.string().nullable(),
+  notes: Yup.string().nullable(),
+  status: Yup.string().required('Status is required')
 });
 
 // Initial values
@@ -281,17 +195,19 @@ const initialImmunizationValues = {
   
   // Vaccination details
   vaccine_type: '',
+  vaccine_name: '',
   dose_number: 1,
   lot_number: '',
   vaccination_date: new Date(),
   next_due_date: null,
+  expiry_date: null,
   
   // Administration details
   site_of_administration: '',
   route_of_administration: '',
+  dosage: '',
   healthcare_provider: '',
   provider_id: '',
-  facility: '',
   facility_id: '',
   
   // Other details
@@ -299,7 +215,7 @@ const initialImmunizationValues = {
   height_cm: '',
   side_effects: '',
   notes: '',
-  status: 'completed'
+  status: 'Administered'
 };
 
 // Immunization Form Component
@@ -321,6 +237,7 @@ const ImmunizationForm = () => {
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [vaccineScheduleInfo, setVaccineScheduleInfo] = useState(null);
+  const [facilities, setFacilities] = useState([]); // Initialize as empty array
 
   // Steps for the form
   const steps = ['Patient Information', 'Vaccination Details', 'Administration Details', 'Additional Information'];
@@ -328,25 +245,40 @@ const ImmunizationForm = () => {
   // Handle form submission
   const handleSubmit = async (values) => {
     try {
-      // Format date values
-      const formattedValues = {
-        ...values,
-        date_of_birth: values.date_of_birth ? format(new Date(values.date_of_birth), 'yyyy-MM-dd') : null,
-        vaccination_date: format(new Date(values.vaccination_date), 'yyyy-MM-dd'),
-        next_due_date: values.next_due_date ? format(new Date(values.next_due_date), 'yyyy-MM-dd') : null
+      // Format the data for API submission
+      const apiData = {
+        patientId: values.patient_id,
+        facilityId: values.facility_id || 'a67c1c4d-ce75-4713-a87c-ab3d7a2444f0', // Default facility
+        vaccineType: values.vaccine_type,
+        vaccineName: values.vaccine_name || values.vaccine_type,
+        doseNumber: parseInt(values.dose_number) || 1,
+        batchNumber: values.lot_number,
+        administrationDate: safeDateFormat(values.vaccination_date),
+        expiryDate: safeDateFormat(values.expiry_date),
+        administeredBy: values.healthcare_provider,
+        administrationSite: values.site_of_administration,
+        administrationRoute: values.route_of_administration,
+        dosage: values.dosage || '0.5 mL',
+        sideEffects: values.side_effects || null,
+        nextDoseDate: safeDateFormat(values.next_due_date),
+        status: values.status,
+        notes: values.notes || null,
+        providerId: values.provider_id || null,
+        weightKg: values.weight_kg ? parseFloat(values.weight_kg) : null,
+        heightCm: values.height_cm ? parseFloat(values.height_cm) : null,
+        ageMonths: values.age_months ? parseInt(values.age_months) : null
       };
 
-      if (isEditMode) {
+      if (isEditMode && id) {
         // Update existing immunization record
         await execute(
           immunizationService.updateImmunization,
-          [id, formattedValues],
+          [id, apiData],
           (response) => {
             setAlertMessage('Immunization record updated successfully');
             setAlertSeverity('success');
             setAlertOpen(true);
             
-            // Navigate back to immunization detail after a short delay
             setTimeout(() => {
               navigate(`/immunization/${id}`);
             }, 1500);
@@ -356,21 +288,20 @@ const ImmunizationForm = () => {
         // Create new immunization record
         await execute(
           immunizationService.createImmunization,
-          [formattedValues],
+          [apiData],
           (response) => {
-            setAlertMessage('Immunization record registered successfully');
+            setAlertMessage('Immunization record created successfully');
             setAlertSeverity('success');
             setAlertOpen(true);
             
-            // Navigate to the new immunization's detail page
             setTimeout(() => {
-              navigate(`/immunization/${response.id}`);
+              navigate(`/immunization/${response.id || response.data?.id}`);
             }, 1500);
           }
         );
       }
     } catch (err) {
-      setAlertMessage('Failed to save immunization record information');
+      setAlertMessage('Failed to save immunization record');
       setAlertSeverity('error');
       setAlertOpen(true);
     }
@@ -386,44 +317,100 @@ const ImmunizationForm = () => {
 
   // Calculate age in months when date of birth changes
   useEffect(() => {
-    if (formik.values.date_of_birth) {
-      const birthDate = new Date(formik.values.date_of_birth);
-      const vaccDate = formik.values.vaccination_date 
-        ? new Date(formik.values.vaccination_date) 
-        : new Date();
-      
-      const ageMonths = differenceInMonths(vaccDate, birthDate);
-      formik.setFieldValue('age_months', ageMonths, false);
+    if (formik.values.date_of_birth && formik.values.vaccination_date) {
+      try {
+        const birthDate = safeParseDate(formik.values.date_of_birth);
+        const vaccDate = safeParseDate(formik.values.vaccination_date);
+        
+        if (birthDate && vaccDate) {
+          const ageMonths = differenceInMonths(vaccDate, birthDate);
+          formik.setFieldValue('age_months', ageMonths, false);
+        }
+      } catch (error) {
+        console.warn('Error calculating age:', error);
+      }
     }
   }, [formik.values.date_of_birth, formik.values.vaccination_date]);
 
   // Update next due date when vaccine type or dose number changes
   useEffect(() => {
-    const updateNextDueDate = async () => {
-      if (formik.values.vaccine_type && formik.values.dose_number && formik.values.vaccination_date) {
-        const scheduleInfo = await immunizationService.getVaccineSchedule(
-          formik.values.vaccine_type,
-          formik.values.dose_number
-        );
-        
-        setVaccineScheduleInfo(scheduleInfo);
-        
-        if (scheduleInfo.isLastDose) {
-          // Last dose, no next due date
-          formik.setFieldValue('next_due_date', null, false);
-        } else {
-          // Calculate next due date based on interval
-          const nextDate = addMonths(
-            new Date(formik.values.vaccination_date),
-            scheduleInfo.interval
-          );
-          formik.setFieldValue('next_due_date', nextDate, false);
+    if (formik.values.vaccine_type && formik.values.dose_number && formik.values.vaccination_date) {
+      const scheduleInfo = getVaccineScheduleInfo(
+        formik.values.vaccine_type,
+        formik.values.dose_number
+      );
+      
+      setVaccineScheduleInfo(scheduleInfo);
+      
+      if (scheduleInfo.isLastDose) {
+        formik.setFieldValue('next_due_date', null, false);
+      } else {
+        try {
+          const vaccDate = safeParseDate(formik.values.vaccination_date);
+          if (vaccDate) {
+            const nextDate = addMonths(vaccDate, scheduleInfo.interval);
+            formik.setFieldValue('next_due_date', nextDate, false);
+          }
+        } catch (error) {
+          console.warn('Error calculating next due date:', error);
         }
+      }
+    }
+  }, [formik.values.vaccine_type, formik.values.dose_number, formik.values.vaccination_date]);
+
+  // Load facilities
+  useEffect(() => {
+    const loadFacilities = async () => {
+      try {
+        console.log('Calling immunizationService.getFacilities()...');
+        const response = await immunizationService.getFacilities();
+        console.log('Raw facilities response:', response);
+        
+        // Handle different possible response structures
+        let facilitiesData = [];
+        
+        if (response) {
+          if (Array.isArray(response)) {
+            // Response is directly an array
+            facilitiesData = response;
+          } else if (response.data) {
+            if (Array.isArray(response.data)) {
+              // Response.data is an array
+              facilitiesData = response.data;
+            } else if (response.data.data && Array.isArray(response.data.data)) {
+              // Nested data structure
+              facilitiesData = response.data.data;
+            } else if (response.data.facilities && Array.isArray(response.data.facilities)) {
+              // Facilities property
+              facilitiesData = response.data.facilities;
+            }
+          }
+        }
+        
+        console.log('Processed facilities data:', facilitiesData);
+        console.log('Is array?', Array.isArray(facilitiesData));
+        
+        // Ensure we always set an array
+        setFacilities(Array.isArray(facilitiesData) ? facilitiesData : []);
+        
+        // If no facilities found, set default
+        if (!Array.isArray(facilitiesData) || facilitiesData.length === 0) {
+          console.warn('No facilities found, using default');
+          setFacilities([
+            { id: 'a67c1c4d-ce75-4713-a87c-ab3d7a2444f0', name: 'Default Facility' }
+          ]);
+        }
+      } catch (error) {
+        console.error('Error loading facilities:', error);
+        // Always set default facility on error
+        setFacilities([
+          { id: 'a67c1c4d-ce75-4713-a87c-ab3d7a2444f0', name: 'Default Facility' }
+        ]);
       }
     };
     
-    updateNextDueDate();
-  }, [formik.values.vaccine_type, formik.values.dose_number, formik.values.vaccination_date]);
+    loadFacilities();
+  }, []);
 
   // Load immunization data if in edit mode
   useEffect(() => {
@@ -435,20 +422,50 @@ const ImmunizationForm = () => {
           immunizationService.getImmunizationById,
           [id],
           (response) => {
-            // Transform API response to form values format
-            const immunizationData = {
-              ...initialImmunizationValues,
-              ...response,
-              date_of_birth: response.date_of_birth ? new Date(response.date_of_birth) : null,
-              vaccination_date: response.vaccination_date ? new Date(response.vaccination_date) : new Date(),
-              next_due_date: response.next_due_date ? new Date(response.next_due_date) : null
+            const immunizationData = response.data || response;
+            const patient = immunizationData.patient || {};
+            const facility = immunizationData.facility || {};
+            
+            // Map API response to form values
+            const formValues = {
+              // Patient information
+              patient_id: immunizationData.patientId || '',
+              patient_name: patient.firstName && patient.lastName ? 
+                `${patient.firstName} ${patient.lastName}` : 'Unknown Patient',
+              date_of_birth: safeParseDate(patient.dateOfBirth),
+              gender: patient.gender || '',
+              age_months: immunizationData.ageMonths || '',
+              
+              // Vaccination details
+              vaccine_type: immunizationData.vaccineType || '',
+              vaccine_name: immunizationData.vaccineName || immunizationData.vaccineType || '',
+              dose_number: immunizationData.doseNumber || 1,
+              lot_number: immunizationData.batchNumber || '',
+              vaccination_date: safeParseDate(immunizationData.administrationDate) || new Date(),
+              next_due_date: safeParseDate(immunizationData.nextDoseDate),
+              expiry_date: safeParseDate(immunizationData.expiryDate),
+              
+              // Administration details
+              site_of_administration: immunizationData.administrationSite || '',
+              route_of_administration: immunizationData.administrationRoute || '',
+              dosage: immunizationData.dosage || '',
+              healthcare_provider: immunizationData.administeredBy || '',
+              provider_id: immunizationData.providerId || '',
+              facility_id: immunizationData.facilityId || '',
+              
+              // Other details
+              weight_kg: immunizationData.weightKg || '',
+              height_cm: immunizationData.heightCm || '',
+              side_effects: immunizationData.sideEffects || '',
+              notes: immunizationData.notes || '',
+              status: immunizationData.status || 'Administered'
             };
             
-            setImmunization(immunizationData);
+            setImmunization(formValues);
             
             // Set formik values
-            Object.keys(immunizationData).forEach(key => {
-              formik.setFieldValue(key, immunizationData[key], false);
+            Object.keys(formValues).forEach(key => {
+              formik.setFieldValue(key, formValues[key], false);
             });
           }
         );
@@ -456,11 +473,10 @@ const ImmunizationForm = () => {
     };
     
     loadImmunization();
-  }, [id]);
+  }, [id, execute]);
 
   // Handle form cancellation
   const handleCancel = () => {
-    // If form is dirty, show confirmation dialog
     if (formik.dirty) {
       setCancelDialogOpen(true);
     } else {
@@ -471,9 +487,9 @@ const ImmunizationForm = () => {
   // Navigate back to the previous page
   const navigateBack = () => {
     if (isEditMode) {
-      navigate(`/immunizations/${id}`);  // Changed from '/immunization/${id}' to '/immunizations/${id}'
+      navigate(`/immunization/${id}`);
     } else {
-      navigate('/immunizations');  // Changed from '/immunization' to '/immunizations'
+      navigate('/immunization');
     }
   };
 
@@ -503,10 +519,20 @@ const ImmunizationForm = () => {
     setSearchLoading(true);
     
     try {
-      const results = await immunizationService.searchPatients(patientSearchTerm);
-      setSearchResults(results);
+      const response = await patientService.searchPatients(patientSearchTerm);
+      const patients = response.data || response || [];
+      
+      const formattedResults = patients.map(patient => ({
+        id: patient.id,
+        name: `${patient.firstName} ${patient.lastName}${patient.otherNames ? ' ' + patient.otherNames : ''}`,
+        gender: patient.gender,
+        date_of_birth: patient.dateOfBirth
+      }));
+      
+      setSearchResults(formattedResults);
     } catch (error) {
       console.error('Error searching for patients:', error);
+      setSearchResults([]);
     } finally {
       setSearchLoading(false);
     }
@@ -517,7 +543,7 @@ const ImmunizationForm = () => {
     formik.setFieldValue('patient_id', patient.id, false);
     formik.setFieldValue('patient_name', patient.name, false);
     formik.setFieldValue('gender', patient.gender, false);
-    formik.setFieldValue('date_of_birth', new Date(patient.date_of_birth), false);
+    formik.setFieldValue('date_of_birth', safeParseDate(patient.date_of_birth), false);
     
     setPatientSearchOpen(false);
     setPatientSearchTerm('');
@@ -528,6 +554,7 @@ const ImmunizationForm = () => {
   const handleVaccineTypeChange = (event) => {
     const vaccineType = event.target.value;
     formik.setFieldValue('vaccine_type', vaccineType, false);
+    formik.setFieldValue('vaccine_name', vaccineType, false);
     
     // Set default administration details based on vaccine type
     switch (vaccineType) {
@@ -557,30 +584,6 @@ const ImmunizationForm = () => {
     }
   };
 
-  // Handle facility selection
-  const handleFacilityChange = (event) => {
-    const facilityId = event.target.value;
-    formik.setFieldValue('facility_id', facilityId, false);
-    
-    // Set facility name
-    const facilityObj = facilities.find(f => f.id === facilityId);
-    if (facilityObj) {
-      formik.setFieldValue('facility', facilityObj.name, false);
-    }
-  };
-
-  // Handle provider selection
-  const handleProviderChange = (event) => {
-    const providerId = event.target.value;
-    formik.setFieldValue('provider_id', providerId, false);
-    
-    // Set provider name
-    const providerObj = healthcareProviders.find(p => p.id === providerId);
-    if (providerObj) {
-      formik.setFieldValue('healthcare_provider', providerObj.name, false);
-    }
-  };
-
   // Render current step content
   const renderStepContent = (step) => {
     switch (step) {
@@ -599,6 +602,7 @@ const ImmunizationForm = () => {
                   variant="outlined"
                   startIcon={<SearchIcon />}
                   onClick={() => setPatientSearchOpen(true)}
+                  disabled={isEditMode} // Disable patient search in edit mode
                 >
                   Search Patient
                 </Button>
@@ -626,7 +630,10 @@ const ImmunizationForm = () => {
                 onBlur={formik.handleBlur}
                 error={formik.touched.patient_id && Boolean(formik.errors.patient_id)}
                 helperText={formik.touched.patient_id && formik.errors.patient_id}
-                disabled={isEditMode}
+                disabled={isEditMode} // Patient cannot be changed in edit mode
+                InputProps={{
+                  readOnly: isEditMode
+                }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -640,12 +647,17 @@ const ImmunizationForm = () => {
                 onBlur={formik.handleBlur}
                 error={formik.touched.patient_name && Boolean(formik.errors.patient_name)}
                 helperText={formik.touched.patient_name && formik.errors.patient_name}
+                disabled={isEditMode} // Patient cannot be changed in edit mode
+                InputProps={{
+                  readOnly: isEditMode
+                }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl 
                 fullWidth
                 error={formik.touched.gender && Boolean(formik.errors.gender)}
+                disabled={isEditMode}
               >
                 <InputLabel id="gender-label">Gender *</InputLabel>
                 <Select
@@ -656,12 +668,13 @@ const ImmunizationForm = () => {
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                   label="Gender *"
+                  disabled={isEditMode} // Patient cannot be changed in edit mode
                 >
                   <MenuItem value="">
                     <em>Select Gender</em>
                   </MenuItem>
-                  <MenuItem value="Male">Male</MenuItem>
-                  <MenuItem value="Female">Female</MenuItem>
+                  <MenuItem value="male">Male</MenuItem>
+                  <MenuItem value="female">Female</MenuItem>
                 </Select>
                 {formik.touched.gender && formik.errors.gender && (
                   <FormHelperText>{formik.errors.gender}</FormHelperText>
@@ -674,6 +687,7 @@ const ImmunizationForm = () => {
                   label="Date of Birth *"
                   value={formik.values.date_of_birth}
                   onChange={(date) => formik.setFieldValue('date_of_birth', date)}
+                  disabled={isEditMode} // Patient cannot be changed in edit mode
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -682,7 +696,10 @@ const ImmunizationForm = () => {
                       onBlur={formik.handleBlur}
                       error={formik.touched.date_of_birth && Boolean(formik.errors.date_of_birth)}
                       helperText={formik.touched.date_of_birth && formik.errors.date_of_birth}
+                      disabled={isEditMode}
                       InputProps={{
+                        ...params.InputProps,
+                        readOnly: isEditMode,
                         endAdornment: (
                           <InputAdornment position="end">
                             <DateRangeIcon color="action" />
@@ -781,6 +798,20 @@ const ImmunizationForm = () => {
                 )}
               </FormControl>
             </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                id="vaccine_name"
+                name="vaccine_name"
+                label="Vaccine Name *"
+                value={formik.values.vaccine_name}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.vaccine_name && Boolean(formik.errors.vaccine_name)}
+                helperText={formik.touched.vaccine_name && formik.errors.vaccine_name}
+              />
+            </Grid>
             
             <Grid item xs={12} sm={6}>
               <FormControl 
@@ -817,6 +848,7 @@ const ImmunizationForm = () => {
                   label="Vaccination Date *"
                   value={formik.values.vaccination_date}
                   onChange={(date) => formik.setFieldValue('vaccination_date', date)}
+                  maxDate={new Date()}
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -826,6 +858,7 @@ const ImmunizationForm = () => {
                       error={formik.touched.vaccination_date && Boolean(formik.errors.vaccination_date)}
                       helperText={formik.touched.vaccination_date && formik.errors.vaccination_date}
                       InputProps={{
+                        ...params.InputProps,
                         endAdornment: (
                           <InputAdornment position="end">
                             <DateRangeIcon color="action" />
@@ -857,6 +890,7 @@ const ImmunizationForm = () => {
                         (vaccineScheduleInfo?.isLastDose ? 'Last dose in series - no next dose required' : 'Calculated based on vaccine schedule')
                       }
                       InputProps={{
+                        ...params.InputProps,
                         endAdornment: (
                           <InputAdornment position="end">
                             <DateRangeIcon color="action" />
@@ -874,13 +908,39 @@ const ImmunizationForm = () => {
                 fullWidth
                 id="lot_number"
                 name="lot_number"
-                label="Lot Number *"
+                label="Batch/Lot Number *"
                 value={formik.values.lot_number}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
                 error={formik.touched.lot_number && Boolean(formik.errors.lot_number)}
                 helperText={formik.touched.lot_number && formik.errors.lot_number}
               />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <DatePicker
+                  label="Expiry Date"
+                  value={formik.values.expiry_date}
+                  onChange={(date) => formik.setFieldValue('expiry_date', date)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      fullWidth
+                      name="expiry_date"
+                      onBlur={formik.handleBlur}
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <DateRangeIcon color="action" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  )}
+                />
+              </LocalizationProvider>
             </Grid>
             
             <Grid item xs={12} sm={6}>
@@ -898,9 +958,10 @@ const ImmunizationForm = () => {
                   onBlur={formik.handleBlur}
                   label="Status *"
                 >
-                  <MenuItem value="completed">Completed</MenuItem>
-                  <MenuItem value="pending">Pending</MenuItem>
-                  <MenuItem value="missed">Missed</MenuItem>
+                  <MenuItem value="Administered">Administered</MenuItem>
+                  <MenuItem value="Scheduled">Scheduled</MenuItem>
+                  <MenuItem value="Missed">Missed</MenuItem>
+                  <MenuItem value="Cancelled">Cancelled</MenuItem>
                 </Select>
                 {formik.touched.status && formik.errors.status && (
                   <FormHelperText>{formik.errors.status}</FormHelperText>
@@ -941,6 +1002,8 @@ const ImmunizationForm = () => {
                   <MenuItem value="Right Upper Arm">Right Upper Arm</MenuItem>
                   <MenuItem value="Left Thigh">Left Thigh</MenuItem>
                   <MenuItem value="Right Thigh">Right Thigh</MenuItem>
+                  <MenuItem value="Left Arm">Left Arm</MenuItem>
+                  <MenuItem value="Right Arm">Right Arm</MenuItem>
                   <MenuItem value="Buttocks">Buttocks</MenuItem>
                   <MenuItem value="Mouth">Mouth</MenuItem>
                   <MenuItem value="Other">Other</MenuItem>
@@ -980,6 +1043,20 @@ const ImmunizationForm = () => {
                 )}
               </FormControl>
             </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                id="dosage"
+                name="dosage"
+                label="Dosage"
+                value={formik.values.dosage}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                placeholder="e.g., 0.5 mL"
+                helperText="Enter the dosage amount and unit"
+              />
+            </Grid>
             
             <Grid item xs={12} sm={6}>
               <FormControl 
@@ -992,16 +1069,24 @@ const ImmunizationForm = () => {
                   id="facility_id"
                   name="facility_id"
                   value={formik.values.facility_id}
-                  onChange={handleFacilityChange}
+                  onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
                   label="Facility *"
                 >
                   <MenuItem value="">
                     <em>Select Facility</em>
                   </MenuItem>
-                  {facilities.map((facility) => (
-                    <MenuItem key={facility.id} value={facility.id}>{facility.name}</MenuItem>
-                  ))}
+                  {Array.isArray(facilities) && facilities.length > 0 ? (
+                    facilities.map((facility) => (
+                      <MenuItem key={facility.id} value={facility.id}>
+                        {facility.name}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem value="a67c1c4d-ce75-4713-a87c-ab3d7a2444f0">
+                      Default Facility
+                    </MenuItem>
+                  )}
                 </Select>
                 {formik.touched.facility_id && formik.errors.facility_id && (
                   <FormHelperText>{formik.errors.facility_id}</FormHelperText>
@@ -1010,31 +1095,30 @@ const ImmunizationForm = () => {
             </Grid>
             
             <Grid item xs={12} sm={6}>
-              <FormControl 
+              <TextField
                 fullWidth
-                error={formik.touched.provider_id && Boolean(formik.errors.provider_id)}
-              >
-                <InputLabel id="provider-label">Healthcare Provider *</InputLabel>
-                <Select
-                  labelId="provider-label"
-                  id="provider_id"
-                  name="provider_id"
-                  value={formik.values.provider_id}
-                  onChange={handleProviderChange}
-                  onBlur={formik.handleBlur}
-                  label="Healthcare Provider *"
-                >
-                  <MenuItem value="">
-                    <em>Select Provider</em>
-                  </MenuItem>
-                  {healthcareProviders.map((provider) => (
-                    <MenuItem key={provider.id} value={provider.id}>{provider.name}</MenuItem>
-                  ))}
-                </Select>
-                {formik.touched.provider_id && formik.errors.provider_id && (
-                  <FormHelperText>{formik.errors.provider_id}</FormHelperText>
-                )}
-              </FormControl>
+                id="healthcare_provider"
+                name="healthcare_provider"
+                label="Healthcare Provider *"
+                value={formik.values.healthcare_provider}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                error={formik.touched.healthcare_provider && Boolean(formik.errors.healthcare_provider)}
+                helperText={formik.touched.healthcare_provider && formik.errors.healthcare_provider}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                id="provider_id"
+                name="provider_id"
+                label="Provider ID"
+                value={formik.values.provider_id}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                helperText="Optional provider identification number"
+              />
             </Grid>
           </Grid>
         );
@@ -1061,6 +1145,7 @@ const ImmunizationForm = () => {
                 onBlur={formik.handleBlur}
                 error={formik.touched.side_effects && Boolean(formik.errors.side_effects)}
                 helperText={formik.touched.side_effects && formik.errors.side_effects}
+                placeholder="Describe any side effects or adverse reactions observed"
               />
             </Grid>
             
@@ -1077,6 +1162,7 @@ const ImmunizationForm = () => {
                 onBlur={formik.handleBlur}
                 error={formik.touched.notes && Boolean(formik.errors.notes)}
                 helperText={formik.touched.notes && formik.errors.notes}
+                placeholder="Any additional notes or observations"
               />
             </Grid>
             
@@ -1109,10 +1195,12 @@ const ImmunizationForm = () => {
     } else if (step === 1) {
       return (
         formik.values.vaccine_type &&
+        formik.values.vaccine_name &&
         formik.values.dose_number &&
         formik.values.vaccination_date &&
         formik.values.lot_number &&
         !formik.errors.vaccine_type &&
+        !formik.errors.vaccine_name &&
         !formik.errors.dose_number &&
         !formik.errors.vaccination_date &&
         !formik.errors.lot_number
@@ -1121,16 +1209,15 @@ const ImmunizationForm = () => {
       return (
         formik.values.site_of_administration &&
         formik.values.route_of_administration &&
-        formik.values.facility &&
+        formik.values.facility_id &&
         formik.values.healthcare_provider &&
         !formik.errors.site_of_administration &&
         !formik.errors.route_of_administration &&
-        !formik.errors.facility &&
+        !formik.errors.facility_id &&
         !formik.errors.healthcare_provider
       );
     }
     
-    // In step 3, check additional information
     return true; // Optional step
   };
 
@@ -1142,23 +1229,34 @@ const ImmunizationForm = () => {
       formik.values.gender &&
       formik.values.date_of_birth &&
       formik.values.vaccine_type &&
+      formik.values.vaccine_name &&
       formik.values.dose_number &&
       formik.values.vaccination_date &&
       formik.values.lot_number &&
       formik.values.site_of_administration &&
       formik.values.route_of_administration &&
-      formik.values.facility &&
+      formik.values.facility_id &&
       formik.values.healthcare_provider &&
       Object.keys(formik.errors).length === 0
     );
   };
 
+  if (loading && !immunization && isEditMode) {
+    return (
+      <MainLayout title="Loading...">
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+          <CircularProgress />
+        </Box>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout 
-      title={isEditMode ? "Edit Immunization Record" : "Register New Immunization"}
+      title={isEditMode ? "Edit Immunization Record" : "New Immunization Record"}
       breadcrumbs={[
         { name: 'Immunization', path: '/immunization' },
-        { name: isEditMode ? 'Edit Immunization Record' : 'Register New Immunization', active: true }
+        { name: isEditMode ? 'Edit Record' : 'New Record', active: true }
       ]}
     >
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -1171,7 +1269,7 @@ const ImmunizationForm = () => {
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="h5" component="h1">
-            {isEditMode ? 'Edit Immunization Record' : 'Register New Immunization'}
+            {isEditMode ? 'Edit Immunization Record' : 'New Immunization Record'}
           </Typography>
         </Box>
 
@@ -1181,66 +1279,60 @@ const ImmunizationForm = () => {
           </Alert>
         )}
 
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-            <CircularProgress />
+        <form onSubmit={formik.handleSubmit}>
+          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+            {steps.map((label, index) => (
+              <Step key={label} completed={isStepComplete(index)}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+
+          <Box sx={{ mb: 3 }}>
+            {renderStepContent(activeStep)}
           </Box>
-        ) : (
-          <form onSubmit={formik.handleSubmit}>
-            <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-              {steps.map((label, index) => (
-                <Step key={label} completed={isStepComplete(index)}>
-                  <StepLabel>{label}</StepLabel>
-                </Step>
-              ))}
-            </Stepper>
 
-            <Box sx={{ mb: 3 }}>
-              {renderStepContent(activeStep)}
-            </Box>
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+            <Button
+              disabled={activeStep === 0}
+              onClick={handleBack}
+              startIcon={<ArrowBackIcon />}
+            >
+              Back
+            </Button>
+            <Box>
               <Button
-                disabled={activeStep === 0}
-                onClick={handleBack}
-                startIcon={<ArrowBackIcon />}
+                variant="outlined"
+                color="secondary"
+                onClick={handleCancel}
+                startIcon={<CancelIcon />}
+                sx={{ mr: 1 }}
               >
-                Back
+                Cancel
               </Button>
-              <Box>
+              {activeStep < steps.length - 1 ? (
                 <Button
-                  variant="outlined"
-                  color="secondary"
-                  onClick={handleCancel}
-                  startIcon={<CancelIcon />}
-                  sx={{ mr: 1 }}
+                  variant="contained"
+                  color="primary"
+                  onClick={handleNext}
+                  disabled={!isStepComplete(activeStep)}
                 >
-                  Cancel
+                  Next
                 </Button>
-                {activeStep < steps.length - 1 ? (
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={handleNext}
-                    disabled={!isStepComplete(activeStep)}
-                  >
-                    Next
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    color="primary"
-                    startIcon={<SaveIcon />}
-                    disabled={!canSubmit()}
-                  >
-                    {isEditMode ? 'Update Record' : 'Register Immunization'}
-                  </Button>
-                )}
-              </Box>
+              ) : (
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  startIcon={loading ? <CircularProgress size={24} /> : <SaveIcon />}
+                  disabled={loading || !canSubmit()}
+                >
+                  {isEditMode ? 'Update Record' : 'Save Record'}
+                </Button>
+              )}
             </Box>
-          </form>
-        )}
+          </Box>
+        </form>
       </Paper>
 
       {/* Patient Search Dialog */}
@@ -1285,10 +1377,10 @@ const ImmunizationForm = () => {
                   fullWidth
                   variant="contained"
                   onClick={handlePatientSearch}
-                  disabled={patientSearchTerm.trim().length < 2}
+                  disabled={patientSearchTerm.trim().length < 2 || searchLoading}
                   sx={{ height: '100%' }}
                 >
-                  Search
+                  {searchLoading ? <CircularProgress size={24} /> : 'Search'}
                 </Button>
               </Grid>
             </Grid>
@@ -1325,7 +1417,7 @@ const ImmunizationForm = () => {
                           </Grid>
                           <Grid item xs={2}>
                             <Typography variant="body2" color="text.secondary">
-                              ID: {patient.id}
+                              ID: {patient.id.substring(0, 8)}...
                             </Typography>
                           </Grid>
                           <Grid item xs={2}>
@@ -1335,7 +1427,7 @@ const ImmunizationForm = () => {
                           </Grid>
                           <Grid item xs={3}>
                             <Typography variant="body2" color="text.secondary">
-                              DOB: {format(new Date(patient.date_of_birth), 'dd/MM/yyyy')}
+                              DOB: {patient.date_of_birth ? format(new Date(patient.date_of_birth), 'dd/MM/yyyy') : 'N/A'}
                             </Typography>
                           </Grid>
                         </Grid>
